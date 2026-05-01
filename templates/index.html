@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ventara - Perhitungan & Prediksi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+
+        .spinner {
+            border: 4px solid #e0f2f1;
+            border-top: 4px solid #14b8a6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        .dot-pulse span {
+            display: inline-block;
+            animation: dotBounce 1.2s infinite ease-in-out;
+            font-size: 1.4rem;
+            line-height: 1;
+            color: #14b8a6;
+        }
+        .dot-pulse span:nth-child(2) { animation-delay: 0.2s; }
+        .dot-pulse span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes dotBounce {
+            0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+            40%            { transform: translateY(-6px); opacity: 1; }
+        }
+
+        @keyframes fadeSlideIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { animation: fadeSlideIn 0.5s ease forwards; }
+    </style>
+</head>
+<body class="bg-gray-50">
+<div class="flex h-screen">
+
+    {% include 'sidebar.html' %}
+
+    <!-- ─── Main Content ─── -->
+    <main class="flex-1 overflow-y-auto">
+
+        {% include 'header.html' %}
+
+        <div class="p-8">
+            <div class="max-w-5xl mx-auto">
+
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-gray-900 mb-1">Perhitungan & Prediksi</h2>
+                    <p class="text-gray-600 text-sm">Pilih algoritma dan periode prediksi untuk peramalan energi</p>
+                </div>
+
+                <!-- ══════════════════════════════════════ -->
+                <!-- STATUS BOX — idle | loading | nlp     -->
+                <!-- ══════════════════════════════════════ -->
+
+                <!-- STATE 1: IDLE -->
+                <div id="stateIdle"
+                    class="bg-white border-2 border-dashed border-gray-300 rounded-xl p-10 text-center mb-6 transition-all duration-300
+                           {% if nlp_report %}hidden{% endif %}">
+                    <div class="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <svg class="w-8 h-8 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                        </svg>
+                    </div>
+                    <p class="text-base font-semibold text-gray-700 mb-1">Siap Melakukan Prediksi</p>
+                    <p class="text-sm text-gray-400">
+                        Pilih model dan klik
+                        <span class="text-teal-600 font-medium">Run Prediksi</span>
+                        atau
+                        <span class="text-teal-600 font-medium">Generate Full CSV</span>
+                        untuk memulai
+                    </p>
+                </div>
+
+                <!-- STATE 2: LOADING -->
+                <div id="stateLoading" class="hidden bg-teal-50 border-2 border-teal-200 rounded-xl p-10 text-center mb-6">
+                    <div class="flex flex-col items-center gap-4">
+                        <div class="spinner"></div>
+                        <div>
+                            <p class="text-base font-semibold text-teal-700 mb-1" id="loadingTitle">Memproses prediksi...</p>
+                            <p class="text-sm text-teal-500">Mohon tunggu, jangan tutup halaman ini</p>
+                        </div>
+                        <div class="dot-pulse mt-1">
+                            <span>•</span><span>•</span><span>•</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STATE 3: NLP RESULT (dari Flask session) -->
+                {% if nlp_report %}
+                <div id="stateNlp" class="fade-in bg-white border-2 border-teal-300 rounded-xl p-6 mb-6">
+                    <div class="flex items-start gap-4">
+                        <div class="w-10 h-10 bg-teal-100 rounded-xl flex justify-center flex-shrink-0">
+                            <svg class="w-5 h-5 mt-2 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+                            </svg>
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="font-semibold text-teal-800">AI Forecast Summary</h3>
+                                <span class="text-xs bg-teal-100 text-teal-600 px-4 py-1 rounded-full font-medium">
+                                    Januari 2025
+                                </span>
+                            </div>
+                            <p class="text-sm text-gray-700 text-justify leading-relaxed">{{ nlp_report }}</p>
+                            <div class="mt-4 pt-4 border-t border-teal-100 flex gap-3">
+                                <a href="/download_full">
+                                    <button class="flex items-center gap-2 px-5 py-2.5 bg-teal-500 text-white font-medium rounded-xl text-sm hover:bg-gray-500 transition-colors">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                        </svg>
+                                        Download Full CSV
+                                    </button>   
+                                </a>
+                                <button onclick="resetToIdle()"
+                                    class="px-4 py-2 bg-gray-100 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors">
+                                    Reset
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- ══════════════════════════════════════ -->
+                <!-- CARD UTAMA                             -->
+                <!-- ══════════════════════════════════════ -->
+                <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+
+                    <!-- Pilih Algoritma + Run -->
+                    <div class="mb-6">
+                        <div class="flex items-center gap-4 mb-4">
+                            <div class="bg-teal-100 rounded-xl pt-2 pl-2.5 w-10 h-10">
+                                <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                            </div>
+                            <h3 class="font-semibold text-gray-900">Pilih Algoritma Machine Learning</h3>
+                        </div>
+
+                        <form method="POST" onsubmit="showLoading('run')" class="flex flex-wrap gap-3 items-center">
+                            {% set model_options = [
+                                ("all",    "General"),
+                                ("knn",    "KNN"),
+                                ("xgb",    "XGBoost"),
+                                ("gbr",    "GBR"),
+                                ("lstm",   "LSTM"),
+                                ("bilstm", "Bi-LSTM")
+                            ] %}
+                            {% for val, label in model_options %}
+                            <label class="cursor-pointer">
+                                <input type="radio" name="model" value="{{ val }}"
+                                    class="hidden peer"
+                                    {% if selected_model == val or (not selected_model and val == 'all') %}checked{% endif %}>
+                                <span class="block px-5 py-2.5 rounded-xl font-medium border-2 text-sm transition-all select-none
+                                    peer-checked:bg-teal-50 peer-checked:border-teal-400 peer-checked:text-teal-700
+                                    bg-gray-100 border-gray-200 text-gray-700 hover:border-teal-200">
+                                    {{ label }}
+                                </span>
+                            </label>
+                            {% endfor %}
+
+                            <button type="submit"
+                                class="ml-auto flex items-center gap-2 px-5 py-2.5 bg-teal-500 text-white font-medium rounded-xl text-sm hover:bg-teal-600 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                                </svg>
+                                Run Prediksi
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- Model Ensemble / Metrics -->
+                    {% if metrics %}
+                    <div class="mb-6">
+                        <h4 class="font-medium text-gray-700 mb-3 text-sm">Model Ensemble yang Digunakan</h4>
+                        <div class="grid grid-cols-3 gap-4">
+                            {% for model, m in metrics.items() %}
+                            {% if selected_model == "all" or selected_model|lower == model|lower %}
+                            <div class="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                                <p class="font-bold text-teal-700 text-base mb-3">{{ model }}</p>
+                                <div class="space-y-1.5 text-xs text-gray-600">
+                                    <div class="flex justify-between">
+                                        <span>MAE</span>
+                                        <span class="font-semibold text-gray-800">{{ m.MAE }}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>RMSE</span>
+                                        <span class="font-semibold text-gray-800">{{ m.RMSE }}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>MAPE</span>
+                                        <span class="font-semibold text-gray-800">{{ m.MAPE }}%</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span>R²</span>
+                                        <span class="font-semibold text-gray-800">{{ m.R2 }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Hasil Prediksi Tabel -->
+                    {% if result %}
+                    <div class="mb-6">
+                        <h4 class="font-medium text-gray-700 mb-3 text-sm">Hasil Prediksi 1 Jam ke Depan</h4>
+                        <div class="overflow-x-auto rounded-xl border border-gray-200">
+                            <table class="w-full text-sm">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Model</th>
+                                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Prediksi (m/s)</th>
+                                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Aktual (m/s)</th>
+                                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Error</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100">
+                                    {% for row in result %}
+                                    <tr class="hover:bg-gray-50 transition-colors">
+                                        <td class="px-5 py-3 font-semibold text-teal-700">{{ row.model }}</td>
+                                        <td class="px-5 py-3 text-gray-800">{{ row.prediction }}</td>
+                                        <td class="px-5 py-3 text-gray-800">{{ row.actual }}</td>
+                                        <td class="px-5 py-3">
+                                            <span class="px-2 py-1 rounded-md text-xs font-medium
+                                                {% if row.error < 0.1 %}bg-green-100 text-green-700
+                                                {% elif row.error < 0.5 %}bg-yellow-100 text-yellow-700
+                                                {% else %}bg-red-100 text-red-700{% endif %}">
+                                                {{ row.error }}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <!-- Action Buttons -->
+                    <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                        {% if result %}
+                        <a href="/download">
+                            <button class="flex items-center gap-2 px-5 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-xl text-sm hover:bg-gray-200 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                                </svg>
+                                Download CSV
+                            </button>
+                        </a>
+                        {% endif %}
+
+                        <a href="/generate_full" onclick="showLoading('generate')">
+                            <button class="flex items-center gap-2 px-5 py-2.5 bg-teal-500 text-white font-medium rounded-xl text-sm hover:bg-teal-600 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                                </svg>
+                                Generate Full CSV
+                            </button>
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script>
+    function showLoading(type) {
+        document.getElementById('stateIdle').classList.add('hidden');
+        const nlpBox = document.getElementById('stateNlp');
+        if (nlpBox) nlpBox.classList.add('hidden');
+        const loadingBox = document.getElementById('stateLoading');
+        loadingBox.classList.remove('hidden');
+        document.getElementById('loadingTitle').textContent =
+            type === 'generate'
+                ? 'Generating Full CSV 31 Hari ke Depan'
+                : 'Memproses prediksi model...';
+    }
+
+    function resetToIdle() {
+        const nlpBox = document.getElementById('stateNlp');
+        if (nlpBox) nlpBox.classList.add('hidden');
+        document.getElementById('stateIdle').classList.remove('hidden');
+    }
+</script>
+</body>
+</html>
