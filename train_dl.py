@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from tensorflow.keras.models import Sequential
 from tensorflow.keras.layers import LSTM, Dense, Bidirectional
 import joblib
@@ -27,42 +28,46 @@ df = df.dropna()
 print("✅ Feature engineering selesai")
 
 # =========================
-# SCALE DATA
+# SPLIT FITUR & TARGET
+# =========================
+X = df.drop(columns=[TARGET])
+y = df[[TARGET]]
+
+# =========================
+# SCALING (DIPISAH 🔥)
 # =========================
 print("📊 Scaling data...")
-scaler = MinMaxScaler()
-data_scaled = scaler.fit_transform(df)
+scaler_X = MinMaxScaler()
+scaler_y = MinMaxScaler()
 
-joblib.dump(scaler, "models/scaler_lstm.pkl")
+X_scaled = scaler_X.fit_transform(X)
+y_scaled = scaler_y.fit_transform(y)
+
+joblib.dump(scaler_X, "models/scaler_X.pkl")
+joblib.dump(scaler_y, "models/scaler_y.pkl")
 print("✅ Scaler disimpan")
 
 # =========================
 # CREATE SEQUENCE
 # =========================
-def create_sequence(data, step=24):
-    X, y = [], []
-    target_index = df.columns.get_loc(TARGET)
-
-    total = len(data) - step
-    print(f"🔄 Membuat sequence total: {total}")
-
-    for i in range(total):
+def create_sequence(X, y, step=48):  # 🔥 dinaikin dari 24 → 48
+    Xs, ys = [], []
+    for i in range(len(X) - step):
         if i % 5000 == 0:
-            print(f"Progress sequence: {i}/{total}")
+            print(f"Progress sequence: {i}/{len(X)-step}")
 
-        X.append(data[i:i+step])
-        y.append(data[i+step][target_index])
+        Xs.append(X[i:i+step])
+        ys.append(y[i+step])
 
-    print("✅ Sequence selesai")
-    return np.array(X), np.array(y)
+    return np.array(Xs), np.array(ys)
 
-X_seq, y_seq = create_sequence(data_scaled)
+X_seq, y_seq = create_sequence(X_scaled, y_scaled)
 
 print("Shape X:", X_seq.shape)
 print("Shape y:", y_seq.shape)
 
 # =========================
-# TRAIN TEST SPLIT (🔥 WAJIB)
+# TRAIN TEST SPLIT
 # =========================
 split = int(len(X_seq) * 0.8)
 
@@ -73,13 +78,24 @@ print("Train:", X_train.shape)
 print("Test :", X_test.shape)
 
 # =========================
+# FUNCTION EVALUASI
+# =========================
+def evaluate(y_true, y_pred):
+    mae = mean_absolute_error(y_true, y_pred)
+    rmse = np.sqrt(mean_squared_error(y_true, y_pred))
+    mape = np.mean(np.abs((y_true - y_pred) / (y_true + 1e-8))) * 100
+    r2 = r2_score(y_true, y_pred)
+    return mae, rmse, mape, r2
+
+# =========================
 # LSTM
 # =========================
 print("🚀 Training LSTM...")
 
 model = Sequential([
-    LSTM(64, return_sequences=True, input_shape=(X_seq.shape[1], X_seq.shape[2])),
-    LSTM(32),
+    LSTM(128, return_sequences=True, input_shape=(X_seq.shape[1], X_seq.shape[2])),
+    LSTM(64),
+    Dense(32, activation='relu'),
     Dense(1)
 ])
 
@@ -94,16 +110,32 @@ model.fit(
 )
 
 model.save("models/lstm.h5")
-print("✅ LSTM selesai disimpan")
+print("✅ LSTM disimpan")
+
+# 🔹 Prediksi + inverse scaling
+y_pred_lstm = model.predict(X_test)
+
+y_pred_lstm = scaler_y.inverse_transform(y_pred_lstm)
+y_test_real = scaler_y.inverse_transform(y_test)
+
+# 🔹 Evaluasi
+mae, rmse, mape, r2 = evaluate(y_test_real, y_pred_lstm)
+
+print("\n📊 HASIL LSTM")
+print(f"MAE  : {mae:.3f}")
+print(f"RMSE : {rmse:.3f}")
+print(f"MAPE : {mape:.2f}%")
+print(f"R²   : {r2:.3f}")
 
 # =========================
 # BiLSTM
 # =========================
-print("🚀 Training BiLSTM...")
+print("\n🚀 Training BiLSTM...")
 
 bilstm = Sequential([
-    Bidirectional(LSTM(64, return_sequences=True), input_shape=(X_seq.shape[1], X_seq.shape[2])),
-    Bidirectional(LSTM(32)),
+    Bidirectional(LSTM(128, return_sequences=True), input_shape=(X_seq.shape[1], X_seq.shape[2])),
+    Bidirectional(LSTM(64)),
+    Dense(32, activation='relu'),
     Dense(1)
 ])
 
@@ -118,6 +150,20 @@ bilstm.fit(
 )
 
 bilstm.save("models/bilstm.h5")
-print("✅ BiLSTM selesai disimpan")
+print("✅ BiLSTM disimpan")
 
-print("🎉 SEMUA TRAINING SELESAI")
+# 🔹 Prediksi + inverse scaling
+y_pred_bilstm = bilstm.predict(X_test)
+
+y_pred_bilstm = scaler_y.inverse_transform(y_pred_bilstm)
+
+# 🔹 Evaluasi
+mae, rmse, mape, r2 = evaluate(y_test_real, y_pred_bilstm)
+
+print("\n📊 HASIL BiLSTM")
+print(f"MAE  : {mae:.3f}")
+print(f"RMSE : {rmse:.3f}")
+print(f"MAPE : {mape:.2f}%")
+print(f"R²   : {r2:.3f}")
+
+print("\n🎉 SEMUA TRAINING & EVALUASI SELESAI")

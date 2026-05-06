@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="id">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ventara - Peramalan Dinamis Energi Angin | Daily & Trends</title>
+    <!-- Tailwind + Inter -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Chart.js untuk grafik trends -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --ventara-primary: #00a991;
+            --ventara-primary-dark: #008774;
+            --ventara-primary-light: #ccf3ee;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f8fafc;
+        }
+
+        .spinner-ventara {
+            border: 3px solid #e0f2f0;
+            border-top: 3px solid var(--ventara-primary);
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 0.7s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        .card-hover {
+            transition: all 0.25s ease;
+        }
+
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -12px rgba(0, 0, 0, 0.1);
+        }
+
+        #map {
+            height: 300px;
+            width: 100%;
+            border-radius: 1rem;
+            z-index: 1;
+            border: 1px solid #e2e8f0;
+        }
+
+        .btn-primary {
+            background-color: var(--ventara-primary);
+            transition: all 0.2s;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--ventara-primary-dark);
+        }
+
+        .tab-active {
+            background-color: var(--ventara-primary);
+            color: white;
+            box-shadow: 0 4px 8px rgba(0,169,145,0.2);
+        }
+
+        .tab-inactive {
+            background-color: #f1f5f9;
+            color: #334155;
+        }
+
+        .progress-bar {
+            background-color: #e2e8f0;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            background-color: var(--ventara-primary);
+            height: 100%;
+            border-radius: 999px;
+        }
+
+        .text-primary {
+            color: var(--ventara-primary);
+        }
+
+        /* carousel hide scrollbar */
+        .scrollbar-hide::-webkit-scrollbar {
+            display: none;
+        }
+
+        .scrollbar-hide {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .carousel-btn {
+            transition: all 0.2s;
+        }
+
+        .carousel-btn.disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        /* Canvas chart wrapper */
+        .chart-card {
+            background: white;
+            border-radius: 1rem;
+            border: 1px solid #e2e8f0;
+            padding: 1rem;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+        }
+    </style>
+</head>
+
+<body class="antialiased bg-gradient-to-br from-slate-50 to-gray-100">
+    <div class="flex h-screen">
+        {% include 'sidebar.html' %}
+
+        <main class="flex-1 overflow-y-auto">
+            {% include 'header.html' %}
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 py-7 space-y-6">
+                <!-- PENCARIAN LOKASI -->
+                <div class="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 transition-all">
+                    <div class="relative">
+                        <i class="fas fa-search absolute left-4 top-1/2 -translate-y-1/2 text-[#00a991] text-sm"></i>
+                        <input type="text" id="searchLocation" placeholder="Cari lokasi (kota / pulau)..."
+                            class="w-full border border-gray-200 rounded-xl pl-11 pr-4 py-3.5 text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#00a991]/60 focus:border-transparent transition text-sm shadow-inner">
+                    </div>
+                </div>
+
+                <!-- PETA + INFO -->
+                <div class="bg-white rounded-2xl border border-gray-200 shadow-md overflow-hidden">
+                    <div class="p-4 pb-2">
+                        <div id="map" class="rounded-xl border border-gray-100 shadow-sm"></div>
+                    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 px-5 pb-5 pt-2 text-sm bg-white/80">
+                        <div class="flex items-center gap-2"><i class="fas fa-globe-asia text-[#00a991] w-4"></i><span
+                                class="font-medium text-gray-600">Koordinat:</span> <span id="coordLat"
+                                class="text-gray-800 font-mono">-5.75</span>°, <span id="coordLng"
+                                class="text-gray-800 font-mono">112.65</span>°</div>
+                        <div class="flex items-center gap-2"><i class="fas fa-location-dot text-[#00a991] w-4"></i><span
+                                class="font-medium text-gray-600">Lokasi:</span> <span id="locName"
+                                class="text-gray-800 font-semibold"></span></div>
+                        <div class="flex items-center gap-2"><i class="fas fa-wind text-[#00a991] w-4"></i><span
+                                class="font-medium text-gray-600">Rata-rata angin (7 hari):</span> <span id="avgWind"
+                                class="text-gray-800 font-semibold">-</span></div>
+                        <div class="flex items-center gap-2"><i class="fas fa-compass text-[#00a991] w-4"></i><span
+                                class="font-medium text-gray-600">Arah dominan (hari ini):</span> <span id="dominantDir"
+                                class="text-gray-800">—</span></div>
+                    </div>
+                </div>
+
+                <!-- TOMBOL NAVIGASI DAILY / TRENDS -->
+                <div class="flex gap-3 justify-start items-center">
+                    <button id="btnDailyView" class="tab-active px-6 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 shadow-sm text-sm"><i class="fas fa-calendar-day"></i> Daily</button>
+                    <button id="btnTrendsView" class="tab-inactive px-6 py-2.5 rounded-xl font-semibold transition-all flex items-center gap-2 shadow-sm text-sm hover:bg-gray-200"><i class="fas fa-chart-line"></i> Trends</button>
+                </div>
+
+                <!-- KONTEN DAILY (CAROUSEL ANGIN & CUACA) -->
+                <div id="dailyContent" class="space-y-6">
+                    <!-- KARTU ANGIN (Carousel 7 hari) -->
+                    <div class="space-y-2">
+                        <div class="relative group" id="windCarouselWrapper">
+                            <div id="windTrack"
+                                class="flex overflow-x-auto scroll-smooth snap-x snap-mandatory gap-5 px-10 py-3 scrollbar-hide">
+                            </div>
+                        </div>
+                    </div>
+                    <!-- RINGKASAN CUACA (Carousel 7 hari) -->
+                    <div class="space-y-2">
+                        <div class="relative group" id="weatherCarouselWrapper">
+                            <div id="weatherTrack"
+                                class="flex overflow-x-auto scroll-smooth snap-x snap-mandatory gap-5 px-10 py-3 scrollbar-hide">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- KONTEN TRENDS (GRAFIK + FILTER) AWALNYA HIDDEN -->
+                <div id="trendsContent" class="hidden space-y-6">
+                    <!-- Filter periode waktu -->
+                    <div class="bg-white rounded-2xl border border-gray-200 p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm">
+                        <div class="flex gap-3">
+                            <button id="filterHourlyBtn" class="bg-[#00a991]/10 text-[#008774] px-5 py-2 rounded-xl font-medium text-sm transition-all hover:bg-[#00a991] hover:text-white"><i class="fas fa-clock mr-1"></i> Per Hari (Jam)</button>
+                            <button id="filterDailyTrendBtn" class="bg-gray-100 text-gray-700 px-5 py-2 rounded-xl font-medium text-sm transition-all hover:bg-[#00a991] hover:text-white"><i class="fas fa-calendar-week mr-1"></i> Per Minggu (Harian)</button>
+                        </div>
+                        <div class="text-xs text-gray-500 bg-gray-50 px-3 py-1.5 rounded-full">
+                            <i class="fas fa-chart-simple mr-1"></i> Tren prediksi 7 hari ke depan
+                        </div>
+                    </div>
+
+                    <!-- Tempat Grafik -->
+                    <div class="grid grid-cols-1 lg:grid-cols-1 gap-6">
+                        <!-- Suhu -->
+                        <div class="chart-card">
+                            <div class="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
+                                <i class="fas fa-thermometer-half text-[#00a991] text-lg"></i>
+                                <h3 class="font-bold text-gray-800">Tren Suhu Maks / Per Jam (°C)</h3>
+                            </div>
+                            <canvas id="tempChart" width="400" height="200" style="max-height: 260px;"></canvas>
+                        </div>
+                        <!-- Kelembapan -->
+                        <div class="chart-card">
+                            <div class="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
+                                <i class="fas fa-tint text-[#00a991] text-lg"></i>
+                                <h3 class="font-bold text-gray-800">Kelembapan Udara (%)</h3>
+                            </div>
+                            <canvas id="humidityChart" width="400" height="200" style="max-height: 260px;"></canvas>
+                        </div>
+                        <!-- Kecepatan Angin -->
+                        <div class="chart-card">
+                            <div class="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
+                                <i class="fas fa-wind text-[#00a991] text-lg"></i>
+                                <h3 class="font-bold text-gray-800">Kecepatan Angin (m/s)</h3>
+                            </div>
+                            <canvas id="windChart" width="400" height="200" style="max-height: 260px;"></canvas>
+                        </div>
+                    </div>
+                    <p class="text-center text-xs text-gray-400 mt-2 italic">*Data berdasarkan model open-meteo, diperbaharui sesuai lokasi peta</p>
+                </div>
+            </div>
+
+            <!-- MODAL DETAIL + BERITA (sama seperti kode asli) -->
+            <div id="modal"
+                class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 transition-all">
+                <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden transform transition-all">
+                    <div
+                        class="flex justify-between items-center p-5 bg-gradient-to-r from-[#00a991] to-[#007f6d] text-white">
+                        <h2 id="modalTitle" class="font-semibold text-lg flex items-center gap-2"><i
+                                class="fas fa-chart-simple"></i>Analisis & Berita</h2>
+                        <button onclick="closeModal()" class="hover:bg-white/20 rounded-full p-1.5 transition"><i
+                                class="fas fa-times"></i></button>
+                    </div>
+                    <div id="modalContent" class="p-6 max-h-[70vh] overflow-y-auto"></div>
+                </div>
+            </div>
+
+            <script>
+                // ---------- GLOBAL ----------
+                let map, currentMarker, currentCircle;
+                let currentLat = -5.75, currentLng = 112.65;
+                let currentLocationName = "Pulau Bawean, Jawa Timur";
+                let dynamicNewsData = [];
+                let dailyRawData = null;  // data daily endpoint
+
+                // Global untuk mode tampilan & cache grafik
+                let activeView = "daily"; // "daily" atau "trends"
+                let hourlyDataCache = null;  // menyimpan data per jam (suhu, kelembapan, kecepatan angin, labels)
+                let currentTrendFilter = "hourly"; // "hourly" atau "dailyAgg"
+                let chartInstances = { temp: null, humidity: null, wind: null };
+
+                // ---------- UTILITY ----------
+                function degToCardinal(deg) { const dirs = ["Utara", "Timur Laut", "Timur", "Tenggara", "Selatan", "Barat Daya", "Barat", "Barat Laut"]; const idx = Math.round(deg / 45) % 8; return dirs[idx]; }
+                function energyPotential(speed) { let percent = Math.min(100, Math.round((speed / 14.2) * 100)); return Math.max(10, percent); }
+                function getWeatherIcon(code) {
+                    if (code === 0) return '☀️ Cerah'; if (code === 1) return '🌤 Sebagian Cerah'; if (code === 2) return '⛅ Berawan'; if (code === 3) return '☁ Mendung';
+                    if (code === 45 || code === 48) return '🌫 Kabut'; if (code >= 51 && code <= 55) return '🌦 Gerimis'; if (code >= 61 && code <= 65) return '🌧 Hujan';
+                    if (code >= 71 && code <= 75) return '❄️ Salju'; if (code >= 80 && code <= 82) return '🌦 Hujan petir'; if (code >= 95) return '⛈ Badai petir';
+                    return '🌥 Berawan';
+                }
+
+                // ---------- MAP ----------
+                function initMap(lat, lng, name) {
+                    if (!map) { map = L.map('map').setView([lat, lng], 9); L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; CartoDB', subdomains: 'abcd' }).addTo(map); }
+                    else { map.setView([lat, lng], 9); }
+                    if (currentMarker) map.removeLayer(currentMarker); if (currentCircle) map.removeLayer(currentCircle);
+                    const ventaraIcon = L.divIcon({ className: 'custom-marker', html: '<div style="background-color:#00a991; width:28px; height:28px; border-radius:50%; border:3px solid white; box-shadow:0 3px 12px rgba(0,0,0,0.25);"></div>', iconSize: [28, 28] });
+                    currentMarker = L.marker([lat, lng], { icon: ventaraIcon }).addTo(map);
+                    currentMarker.bindPopup(`<b>${name}</b><br>🌊 Pusat prakiraan energi angin 7 hari`).openPopup();
+                    currentCircle = L.circle([lat, lng], { color: '#00a991', fillColor: '#b8e8e0', fillOpacity: 0.25, radius: 16000, weight: 1.8 }).addTo(map);
+                }
+
+                // ---------- API FETCH : Daily & Hourly ----------
+                async function fetchWeatherData(lat, lng) {
+                    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=wind_speed_10m_max,wind_direction_10m_dominant,temperature_2m_max,weathercode&timezone=auto&forecast_days=7`;
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error("Gagal mengambil data cuaca harian.");
+                    const data = await resp.json();
+                    return data.daily;
+                }
+
+                async function fetchHourlyData(lat, lng) {
+                    // Ambil data per jam untuk 7 hari ke depan (suhu, kelembapan, kecepatan angin)
+                    const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&hourly=temperature_2m,relativehumidity_2m,wind_speed_10m&timezone=auto&forecast_days=7`;
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error("Gagal mengambil data per jam");
+                    const data = await resp.json();
+                    return data.hourly;
+                }
+
+                async function getLocationName(lat, lng) {
+                    try { const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=12&addressdetails=1`, { headers: { 'User-Agent': 'Ventara-Dashboard/2.0' } }); const data = await res.json(); if (data.display_name) { let parts = data.display_name.split(','); let city = parts[0] + (parts[1] ? ', ' + parts[1] : ''); return city.length > 50 ? city.substring(0, 47) + '...' : city; } return `${lat.toFixed(2)}°, ${lng.toFixed(2)}°`; } catch (e) { return `📍 ${lat.toFixed(2)}°, ${lng.toFixed(2)}°`; }
+                }
+                async function searchLocation(query) { const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=1`; const resp = await fetch(url, { headers: { 'User-Agent': 'Ventara-Dashboard/2.0' } }); const data = await resp.json(); if (!data.length) throw new Error("Lokasi tidak ditemukan."); const place = data[0]; return { lat: parseFloat(place.lat), lng: parseFloat(place.lon), displayName: place.display_name.split(',')[0] }; }
+
+                // ---------- CAROUSEL HELPERS ----------
+                function initCarouselControls(trackId, prevBtnId, nextBtnId) {
+                    const track = document.getElementById(trackId);
+                    const prevBtn = document.getElementById(prevBtnId);
+                    const nextBtn = document.getElementById(nextBtnId);
+                    if (!track || !prevBtn || !nextBtn) return;
+                    const updateButtons = () => {
+                        const maxScroll = track.scrollWidth - track.clientWidth;
+                        if (maxScroll <= 1) { prevBtn.classList.add('disabled'); nextBtn.classList.add('disabled'); return; }
+                        if (track.scrollLeft <= 5) prevBtn.classList.add('disabled'); else prevBtn.classList.remove('disabled');
+                        if (track.scrollLeft + track.clientWidth >= maxScroll - 5) nextBtn.classList.add('disabled'); else nextBtn.classList.remove('disabled');
+                    };
+                    const scrollStep = (direction) => { const step = track.clientWidth * 0.85; if (direction === 'left') track.scrollBy({ left: -step, behavior: 'smooth' }); else track.scrollBy({ left: step, behavior: 'smooth' }); setTimeout(updateButtons, 200); };
+                    prevBtn.onclick = () => scrollStep('left'); nextBtn.onclick = () => scrollStep('right');
+                    track.addEventListener('scroll', updateButtons);
+                    window.addEventListener('resize', () => setTimeout(updateButtons, 100));
+                    setTimeout(updateButtons, 50);
+                }
+
+                // ---------- MEMBANGUN KARTU DAILY (CAROUSEL) ----------
+                function buildWindCards(daily) {
+                    const days = daily.time; const speeds = daily.wind_speed_10m_max; const dirs = daily.wind_direction_10m_dominant;
+                    let html = '';
+                    for (let i = 0; i < days.length; i++) {
+                        const dateObj = new Date(days[i]);
+                        const formattedDate = dateObj.toLocaleDateString('id-ID', { weekday: 'short', day: 'numeric', month: 'short' });
+                        let dayLabel = i === 0 ? 'Hari ini' : i === 1 ? 'Besok' : i === 2 ? 'Lusa' : `+${i} hari`;
+                        const windVal = speeds[i]; const windDirText = degToCardinal(dirs[i]); const gustEst = (windVal + 2.0).toFixed(1);
+                        html += `<div class="snap-start min-w-[280px] md:min-w-[300px] bg-white rounded-2xl border border-gray-200 shadow-sm p-5 card-hover flex flex-col shrink-0 transition">
+                            <div class="flex justify-between items-start mb-2"><span class="text-xs font-semibold text-gray-400 bg-gray-50 px-2 py-0.5 rounded-full">${formattedDate}</span><span class="text-[11px] font-bold text-[#00a991] bg-[#e6f6f4] px-2 py-0.5 rounded-full">${dayLabel}</span></div>
+                            <div class="flex items-center gap-4 mt-1 mb-3"><div class="w-12 h-12 rounded-xl flex items-center justify-center"><span class="wind-arrow text-2xl" style="transform: rotate(${dirs[i]}deg);">🧭</span></div><div><p class="text-xs text-gray-500">Kecepatan maks</p><h3 class="text-2xl font-bold text-gray-800">${windVal}<span class="text-sm font-normal text-gray-500"> m/s</span></h3></div></div>
+                            <div class="flex justify-between text-xs mb-2"><span><i class="fas fa-location-arrow text-[#00a991] mr-1"></i> Arah: ${windDirText}</span><span class="text-gray-500">💨 hembusan: ${gustEst} m/s</span></div>
+                        </div>`;
+                    }
+                    return html;
+                }
+
+                function buildWeatherCards(daily) {
+                    const days = daily.time; const temps = daily.temperature_2m_max; const codes = daily.weathercode; const speeds = daily.wind_speed_10m_max;
+                    let html = '';
+                    for (let i = 0; i < days.length; i++) {
+                        const dateObj = new Date(days[i]); const shortDate = dateObj.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+                        let dayLabel = i === 0 ? 'Hari ini' : i === 1 ? 'Besok' : i === 2 ? 'Lusa' : `Hari ke-${i + 1}`;
+                        const temp = temps[i]; const weatherCode = codes[i]; const weatherText = getWeatherIcon(weatherCode);
+                        const windSp = speeds[i]; const energyVal = energyPotential(windSp);
+                        const weatherIconSimple = weatherText.split(' ')[0];
+                        html += `<div class="snap-start min-w-[280px] md:min-w-[310px] bg-white rounded-2xl border border-gray-200 shadow-sm p-5 card-hover flex flex-col shrink-0 transition">
+                            <div class="flex justify-between items-center border-b border-gray-100 pb-2 mb-3"><span class="text-sm font-bold text-gray-700">${shortDate} · ${dayLabel}</span><span class="text-2xl drop-shadow-sm">${weatherIconSimple}</span></div>
+                            <div class="flex items-center justify-between mt-1"><div><p class="text-xs text-gray-500">Suhu maks</p><p class="text-2xl font-extrabold text-gray-800">${temp}°C</p></div><div class="text-right"><p class="text-xs text-gray-500">Kecepatan angin</p><p class="text-xl font-bold text-[#00a991]">${windSp} m/s</p></div></div>
+                            <button onclick="openWeatherDetailWithNews('${shortDate}', ${windSp}, '${weatherText.replace(/'/g, "\\'")}', ${temp}, ${energyVal}, ${i})" class="mt-5 w-full bg-[#00a991] hover:bg-[#008774] text-white text-sm font-medium py-2.5 rounded-xl transition shadow-sm flex items-center justify-center gap-2"><i class="fas fa-newspaper text-xs"></i> Detail & Analisis</button>
+                        </div>`;
+                    }
+                    return html;
+                }
+
+                // ---------- GENERATE BERITA DINAMIS ----------
+                function generateDynamicNews(location, avgSpeed, dominantDir) {
+                    return [
+                        { title: `🌬 Potensi angin hijau di ${location}`, content: `Berdasarkan model prediksi Ventara, kecepatan angin rata-rata di wilayah ${location} mencapai ${avgSpeed} m/s dalam 7 hari ke depan. Kondisi ini sangat prospektif untuk pembangkit listrik tenaga bayu, dengan estimasi peningkatan efisiensi turbin hingga +23%. Arah angin dominan ${dominantDir} memberikan stabilitas optimal untuk blade.` },
+                        { title: `⚡ Inovasi penyimpanan & grid cerdas`, content: `Sistem baterai hibrida mulai diimplementasikan di kawasan pesisir timur, termasuk area ${location}. Kombinasi prakiraan angin yang kuat memungkinkan pemanfaatan malam hari lebih stabil, penyimpanan energi meningkat 17% lebih efisien berkolaborasi dengan ramalan Ventara.` },
+                        { title: `📈 Outlook energi bersih: ${location} unggulan`, content: `Analisis satelit dan machine learning menunjukkan pola hembusan angin yang konsisten di ${location}. Potensi pembangkit hybrid angin + surya diperkirakan naik 28% pada musim timur tahun ini. Ventara merekomendasikan optimalisasi turbin dengan pitch control adaptif.` }
+                    ];
+                }
+
+                // ---------- CHART MANAGEMENT (TRENDS) ----------
+                function destroyCharts() {
+                    if (chartInstances.temp) { chartInstances.temp.destroy(); chartInstances.temp = null; }
+                    if (chartInstances.humidity) { chartInstances.humidity.destroy(); chartInstances.humidity = null; }
+                    if (chartInstances.wind) { chartInstances.wind.destroy(); chartInstances.wind = null; }
+                }
+
+                // Proses data per jam -> agregasi harian untuk filter per minggu (harian)
+                function aggregateDailyFromHourly(hourlyData) {
+                    const times = hourlyData.time;
+                    const temps = hourlyData.temperature_2m;
+                    const humidity = hourlyData.relativehumidity_2m;
+                    const winds = hourlyData.wind_speed_10m;
+                    const dailyMap = new Map();
+                    for (let i = 0; i < times.length; i++) {
+                        const dateKey = times[i].split('T')[0];
+                        if (!dailyMap.has(dateKey)) dailyMap.set(dateKey, { temps: [], humidity: [], winds: [] });
+                        const day = dailyMap.get(dateKey);
+                        day.temps.push(temps[i]);
+                        day.humidity.push(humidity[i]);
+                        day.winds.push(winds[i]);
+                    }
+                    const labels = [];
+                    const tempMax = [];
+                    const humidityAvg = [];
+                    const windAvg = [];
+                    for (let [key, values] of dailyMap.entries()) {
+                        labels.push(key.slice(5)); // format MM-DD
+                        tempMax.push(Math.max(...values.temps));
+                        humidityAvg.push((values.humidity.reduce((a,b)=>a+b,0)/values.humidity.length).toFixed(1));
+                        windAvg.push((values.winds.reduce((a,b)=>a+b,0)/values.winds.length).toFixed(1));
+                    }
+                    return { labels, tempMax, humidityAvg, windAvg };
+                }
+
+                async function renderTrendsCharts() {
+                    if (!hourlyDataCache) {
+                        console.warn("Data hourly belum tersedia, coba refresh");
+                        return;
+                    }
+                    destroyCharts();
+                    if (currentTrendFilter === "hourly") {
+                        // tampilkan data per jam untuk 24 jam pertama (hari ini/ besok)
+                        const times = hourlyDataCache.time;
+                        const temps = hourlyDataCache.temperature_2m;
+                        const humidity = hourlyDataCache.relativehumidity_2m;
+                        const winds = hourlyDataCache.wind_speed_10m;
+                        const first24Times = times.slice(0, 24);
+                        const first24Temps = temps.slice(0, 24);
+                        const first24Hum = humidity.slice(0, 24);
+                        const first24Winds = winds.slice(0, 24);
+                        const labels = first24Times.map(t => {
+                            const date = new Date(t);
+                            return date.getHours() + ":00";
+                        });
+                        chartInstances.temp = new Chart(document.getElementById("tempChart"), { type: 'line', data: { labels, datasets: [{ label: 'Suhu (°C)', data: first24Temps, borderColor: '#00a991', backgroundColor: 'rgba(0,169,145,0.05)', tension: 0.3, fill: true }] }, options: { responsive: true, maintainAspectRatio: true } });
+                        chartInstances.humidity = new Chart(document.getElementById("humidityChart"), { type: 'line', data: { labels, datasets: [{ label: 'Kelembapan (%)', data: first24Hum, borderColor: '#3b82f6', backgroundColor: 'rgba(59,130,246,0.05)', tension: 0.3 }] }, options: { responsive: true } });
+                        chartInstances.wind = new Chart(document.getElementById("windChart"), { type: 'line', data: { labels, datasets: [{ label: 'Kecepatan Angin (m/s)', data: first24Winds, borderColor: '#f97316', backgroundColor: 'rgba(249,115,22,0.05)', tension: 0.3 }] }, options: { responsive: true } });
+                    } 
+                    else if (currentTrendFilter === "dailyAgg") {
+                        const aggregated = aggregateDailyFromHourly(hourlyDataCache);
+                        chartInstances.temp = new Chart(document.getElementById("tempChart"), { type: 'line', data: { labels: aggregated.labels, datasets: [{ label: 'Suhu Maks Harian (°C)', data: aggregated.tempMax, borderColor: '#00a991', tension: 0.2, fill: false, pointBackgroundColor: '#00a991' }] }, options: { responsive: true } });
+                        chartInstances.humidity = new Chart(document.getElementById("humidityChart"), { type: 'line', data: { labels: aggregated.labels, datasets: [{ label: 'Kelembapan Rata-rata (%)', data: aggregated.humidityAvg, borderColor: '#3b82f6', tension: 0.2 }] }, options: { responsive: true } });
+                        chartInstances.wind = new Chart(document.getElementById("windChart"), { type: 'line', data: { labels: aggregated.labels, datasets: [{ label: 'Kecepatan Angin Rata-rata (m/s)', data: aggregated.windAvg, borderColor: '#f97316', tension: 0.2 }] }, options: { responsive: true } });
+                    }
+                }
+
+                // Fungsi refresh data hourly + update tampilan trends jika mode aktif
+                async function refreshHourlyDataAndTrends(lat, lng) {
+                    try {
+                        const hourly = await fetchHourlyData(lat, lng);
+                        hourlyDataCache = hourly; 
+                        if (activeView === "trends") {
+                            await renderTrendsCharts();
+                        }
+                    } catch(err) {
+                        console.error("Gagal ambil data per jam", err);
+                        // fallback: tampilkan pesan error di canvas
+                        if(activeView === "trends") document.querySelector('#trendsContent .chart-card')?.insertAdjacentHTML('beforeend', '<p class="text-red-500 text-sm">Gagal memuat data tren</p>');
+                    }
+                }
+
+                // ---------- MODAL ----------
+                window.openWeatherDetailWithNews = function (date, windSpeed, weatherCond, temp, energy, dayIndex = 0) {
+                    const modal = document.getElementById('modal');
+                    const modalTitle = document.getElementById('modalTitle');
+                    const modalContent = document.getElementById('modalContent');
+                    modalTitle.innerHTML = `<i class="fas fa-chart-line mr-1"></i> Insight Energi & Liputan Ventara`;
+                    let newsHtml = dynamicNewsData.map((n, idx) => `<div onclick="openNewsModal(${idx})" class="border border-gray-200 rounded-xl p-3 mb-3 hover:bg-[#e6f6f4] cursor-pointer transition-all flex items-start gap-3 shadow-sm"><i class="fas fa-bolt mt-1 text-[#00a991]"></i><div><p class="font-semibold text-gray-800 text-sm">${n.title}</p><p class="text-[11px] text-gray-500">Klik untuk baca selengkapnya →</p></div></div>`).join('');
+                    modalContent.innerHTML = `<div class="bg-[#e6f6f4] rounded-xl p-4 mb-5 border border-[#b8e4dd]"><div class="flex flex-wrap justify-between gap-2 text-sm"><span><i class="far fa-calendar-alt text-[#00a991] mr-1"></i> <strong>${date}</strong></span><span><i class="fas fa-thermometer-half"></i> ${temp}°C</span><span><i class="fas fa-charging-station"></i> Potensi ${energy}%</span></div><div class="grid grid-cols-2 gap-4 mt-4"><div class="bg-white p-3 rounded-xl text-center shadow-sm"><span class="block text-2xl font-bold text-gray-800">${windSpeed} m/s</span><span class="text-[11px] text-gray-500">Kecepatan angin max</span></div><div class="bg-white p-3 rounded-xl text-center shadow-sm"><span class="block text-2xl font-bold text-[#00a991]">${energy}%</span><span class="text-[11px] text-gray-500">Estimasi output listrik</span></div></div><p class="text-sm text-gray-700 mt-3"><i class="fas fa-cloud-sun-rain text-[#00a991]"></i> Kondisi: ${weatherCond} · Kombinasi suhu & angin mendukung produksi bersih.</p></div><h3 class="font-bold text-gray-800 mb-3 flex items-center gap-2"><i class="fas fa-newspaper text-[#00a991]"></i> Wawasan & berita energi angin (lokal)</h3><div id="newsListContainer">${newsHtml || '<p class="text-gray-400 text-center">Tidak ada kabar terkini</p>'}</div>`;
+                    modal.classList.remove('hidden');
+                };
+                window.openNewsModal = function (index) {
+                    const news = dynamicNewsData[index];
+                    const modalContent = document.getElementById('modalContent');
+                    const modalTitle = document.getElementById('modalTitle');
+                    modalTitle.innerHTML = `<i class="fas fa-newspaper"></i> ${news.title.substring(0, 58)}`;
+                    modalContent.innerHTML = `<button onclick="openWeatherDetailWithNews('Detail', 0, '', 0, 0, 0)" class="text-[#00a991] text-sm mb-4 flex items-center gap-1 hover:underline"><i class="fas fa-arrow-left"></i> Kembali ke ringkasan</button><div class="rounded-xl overflow-hidden mb-5 shadow-md"><img src="https://source.unsplash.com/800x300/?wind,turbine,renewable,energy,${currentLocationName.split(' ')[0]}" class="w-full h-44 object-cover rounded-xl" alt="wind energy"></div><p class="text-gray-700 leading-relaxed text-sm">${news.content}</p><div class="flex flex-wrap gap-2 mt-5"><span class="bg-[#e6f6f4] text-[#008774] text-xs px-3 py-1 rounded-full font-medium">Energi Terbarukan</span><span class="bg-[#e6f6f4] text-[#008774] text-xs px-3 py-1 rounded-full font-medium">Prakiraan Ventara</span><span class="bg-gray-100 text-gray-700 text-xs px-3 py-1 rounded-full">📍 ${currentLocationName}</span></div>`;
+                };
+                window.closeModal = function () { document.getElementById('modal').classList.add('hidden'); };
+
+                // ---------- UPDATE SEMUA UI (daily + data cache) ----------
+                async function updateAllByLocation(lat, lng, locationTitle) {
+                    document.getElementById('windTrack').innerHTML = `<div class="flex justify-center w-full py-10"><div class="spinner-ventara"></div><span class="ml-3 text-gray-500">Memuat prakiraan angin 7 hari...</span></div>`;
+                    document.getElementById('weatherTrack').innerHTML = `<div class="flex justify-center w-full py-10"><div class="spinner-ventara"></div><span class="ml-3 text-gray-500">Memuat data cuaca...</span></div>`;
+                    try {
+                        const daily = await fetchWeatherData(lat, lng);
+                        dailyRawData = daily;
+                        const windSpeeds = daily.wind_speed_10m_max;
+                        const windDirs = daily.wind_direction_10m_dominant;
+                        const avgSpeed = (windSpeeds.reduce((a, b) => a + b, 0) / windSpeeds.length).toFixed(1);
+                        const firstDirection = degToCardinal(windDirs[0]);
+                        document.getElementById('coordLat').innerText = lat.toFixed(4);
+                        document.getElementById('coordLng').innerText = lng.toFixed(4);
+                        document.getElementById('locName').innerText = locationTitle;
+                        document.getElementById('avgWind').innerHTML = avgSpeed + " m/s";
+                        document.getElementById('dominantDir').innerHTML = firstDirection;
+                        dynamicNewsData = generateDynamicNews(locationTitle, avgSpeed, firstDirection);
+                        const windCardsHtml = buildWindCards(daily);
+                        const weatherCardsHtml = buildWeatherCards(daily);
+                        document.getElementById('windTrack').innerHTML = windCardsHtml;
+                        document.getElementById('weatherTrack').innerHTML = weatherCardsHtml;
+                        setTimeout(() => {
+                            initCarouselControls('windTrack', 'windPrevBtn', 'windNextBtn');
+                            initCarouselControls('weatherTrack', 'weatherPrevBtn', 'weatherNextBtn');
+                        }, 30);
+                        initMap(lat, lng, locationTitle);
+                        // Refresh data per jam untuk keperluan trends
+                        await refreshHourlyDataAndTrends(lat, lng);
+                    } catch (err) {
+                        console.error(err);
+                        document.getElementById('windTrack').innerHTML = `<div class="w-full text-center text-red-600 bg-red-50 p-4 rounded-xl">⚠️ Gagal memuat data 7 hari: ${err.message}</div>`;
+                    }
+                }
+
+                // ---------- SWITCH VIEW DAILY / TRENDS ----------
+                function setActiveView(view) {
+                    activeView = view;
+                    const dailyDiv = document.getElementById('dailyContent');
+                    const trendsDiv = document.getElementById('trendsContent');
+                    const btnDaily = document.getElementById('btnDailyView');
+                    const btnTrends = document.getElementById('btnTrendsView');
+                    if (view === 'daily') {
+                        dailyDiv.classList.remove('hidden');
+                        trendsDiv.classList.add('hidden');
+                        btnDaily.classList.add('tab-active'); btnDaily.classList.remove('tab-inactive');
+                        btnTrends.classList.add('tab-inactive'); btnTrends.classList.remove('tab-active');
+                    } else {
+                        dailyDiv.classList.add('hidden');
+                        trendsDiv.classList.remove('hidden');
+                        btnDaily.classList.remove('tab-active'); btnDaily.classList.add('tab-inactive');
+                        btnTrends.classList.remove('tab-inactive'); btnTrends.classList.add('tab-active');
+                        if (hourlyDataCache) renderTrendsCharts();
+                        else refreshHourlyDataAndTrends(currentLat, currentLng);
+                    }
+                }
+
+                // Filter periode untuk trends
+                function setupTrendsFilters() {
+                    const hourlyBtn = document.getElementById('filterHourlyBtn');
+                    const dailyTrendBtn = document.getElementById('filterDailyTrendBtn');
+                    hourlyBtn.addEventListener('click', () => {
+                        currentTrendFilter = 'hourly';
+                        hourlyBtn.classList.add('bg-[#00a991]', 'text-white'); hourlyBtn.classList.remove('bg-[#00a991]/10', 'text-[#008774]');
+                        dailyTrendBtn.classList.remove('bg-[#00a991]', 'text-white'); dailyTrendBtn.classList.add('bg-gray-100', 'text-gray-700');
+                        if (hourlyDataCache) renderTrendsCharts();
+                    });
+                    dailyTrendBtn.addEventListener('click', () => {
+                        currentTrendFilter = 'dailyAgg';
+                        dailyTrendBtn.classList.add('bg-[#00a991]', 'text-white'); dailyTrendBtn.classList.remove('bg-gray-100', 'text-gray-700');
+                        hourlyBtn.classList.remove('bg-[#00a991]', 'text-white'); hourlyBtn.classList.add('bg-[#00a991]/10', 'text-[#008774]');
+                        if (hourlyDataCache) renderTrendsCharts();
+                    });
+                }
+
+                // ---------- SEARCH & INIT ----------
+                async function handleSearch() {
+                    const query = document.getElementById('searchLocation').value.trim();
+                    if (!query) { alert("Masukkan nama lokasi (contoh: Bawean, Jakarta, Bali)"); return; }
+                    const inputEl = document.getElementById('searchLocation');
+                    inputEl.classList.add('opacity-70');
+                    try {
+                        const { lat, lng, displayName } = await searchLocation(query);
+                        currentLat = lat; currentLng = lng; currentLocationName = displayName;
+                        await updateAllByLocation(currentLat, currentLng, currentLocationName);
+                        document.getElementById('searchLocation').value = currentLocationName;
+                    } catch (err) { alert("⚠️ " + err.message); }
+                    finally { inputEl.classList.remove('opacity-70'); }
+                }
+
+                async function initDefault() {
+                    await updateAllByLocation(-5.75, 112.65, "Pulau Bawean, Jawa Timur");
+                    document.getElementById('searchLocation').value = "Pulau Bawean, Jawa Timur";
+                    setActiveView('daily');
+                    setupTrendsFilters();
+                }
+
+                document.getElementById('searchLocation').addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSearch(); });
+                document.getElementById('btnDailyView').addEventListener('click', () => setActiveView('daily'));
+                document.getElementById('btnTrendsView').addEventListener('click', () => setActiveView('trends'));
+                initDefault();
+            </script>
+        </main>
+    </div>
+</body>
+
+</html>
