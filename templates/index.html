@@ -218,7 +218,7 @@
 
                         <!-- 🔹 BARIS ATAS (SELain LSTM & BiLSTM) -->
                         <div class="grid grid-cols-3 gap-4">
-                            {% for model, m in all_metrics.items() if model not in ['LSTM','BiLSTM'] %}
+                            {% for model, m in metrics.items() if model not in ['LSTM','BiLSTM'] %}
 
                             {% set is_best = model in best_model_names %}
                             {% set rank = best_model_names.index(model) + 1 if is_best else 0 %}
