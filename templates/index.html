@@ -101,6 +101,7 @@
                 <!-- STATE 3: NLP RESULT -->
                 {% if nlp_report %}
                 <div id="stateNlp" class="fade-in bg-white border-2 border-teal-300 rounded-xl p-6 mb-6">
+                    <input type="hidden" id="lastGenerateMode" value="{{ session.get('last_generate_mode', 'general') }}">
                     <div class="flex items-start gap-4">
                         <div class="w-10 h-10 bg-teal-100 rounded-xl flex justify-center flex-shrink-0">
                             <svg class="w-5 h-5 mt-2 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,7 +118,7 @@
                             </div>
                             <p class="text-sm text-gray-700 text-justify leading-relaxed">{{ nlp_report }}</p>
                             <div class="mt-4 pt-4 border-t border-teal-100 flex gap-3">
-                                <a href="/download_full">
+                                <a href="#" onclick="downloadCSV()">
                                     <button class="flex items-center gap-2 px-5 py-2.5 bg-teal-500 text-white font-medium rounded-lg text-sm hover:bg-teal-600 transition-colors">
                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
@@ -372,18 +373,8 @@
 
                     <!-- Action Buttons -->
                     <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
-                        <!-- {% if result %}
-                        <a href="/download">
-                            <button class="flex items-center gap-2 px-5 py-2.5 bg-gray-100 text-gray-700 font-medium rounded-xl text-sm hover:bg-gray-200 transition-colors">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                                </svg>
-                                Download CSV
-                            </button>
-                        </a>
-                        {% endif %} -->
 
-                        <a href="/generate_full" onclick="showLoading('generate')">
+                        <a href="#" onclick="generateCSV()">
                             <button class="flex items-center gap-2 px-5 py-2.5 bg-teal-500 text-white font-medium rounded-xl text-sm hover:bg-teal-600 transition-colors">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
@@ -392,14 +383,6 @@
                             </button>
                         </a>
 
-                        <!-- <a href="/download_full">
-                            <button class="flex items-center gap-2 px-5 py-2.5 bg-gray-400 text-white font-medium rounded-xl text-sm hover:bg-gray-500 transition-colors">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                                </svg>
-                                Download Full CSV
-                            </button>
-                        </a> -->
                     </div>
 
                 </div>
@@ -408,24 +391,191 @@
     </main>
 </div>
 
+            <!-- TOAST PROGRESS -->
+                <div id="progressToast"
+                    class="hidden fixed bottom-5 right-5 z-50 w-80 bg-white border border-teal-200 shadow-2xl rounded-2xl p-4 transition-all duration-300">
+
+                    <!-- HEADER -->
+                    <div class="flex items-center justify-between mb-2">
+
+                        <div>
+                            <h3 class="text-sm font-semibold text-teal-700">
+                                Generating Forecast
+                            </h3>
+
+                            <p class="text-xs text-gray-500">
+                                AI Forecast Progress
+                            </p>
+                        </div>
+
+                        <span id="toastPercent"
+                            class="text-xs font-semibold text-teal-600">
+                            0%
+                        </span>
+                    </div>
+
+                    <!-- PROGRESS BAR -->
+                    <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
+
+                        <div id="toastBar"
+                            class="h-full bg-teal-500 rounded-full transition-all duration-500"
+                            style="width:0%">
+                        </div>
+                    </div>
+
+                    <!-- STATUS -->
+                    <p id="toastStatus"
+                        class="text-sm text-gray-700 font-medium">
+                        Preparing...
+                    </p>
+
+                    <!-- ETA -->
+                    <p id="toastETA"
+                        class="text-xs text-gray-500 mt-1">
+                        ETA -- • Elapsed --
+                    </p>
+                </div>
+
 <script>
-    function showLoading(type) {
-        document.getElementById('stateIdle').classList.add('hidden');
-        const nlpBox = document.getElementById('stateNlp');
-        if (nlpBox) nlpBox.classList.add('hidden');
-        const loadingBox = document.getElementById('stateLoading');
-        loadingBox.classList.remove('hidden');
-        document.getElementById('loadingTitle').textContent =
-            type === 'generate'
-                ? 'Generating Full CSV 31 Hari ke Depan'
-                : 'Memproses prediksi model...';
+let _pollActive = false;
+
+function showLoading(type) {
+    document.getElementById('stateIdle').classList.add('hidden');
+    const nlpBox = document.getElementById('stateNlp');
+    if (nlpBox) nlpBox.classList.add('hidden');
+    document.getElementById('stateLoading').classList.remove('hidden');
+    document.getElementById('loadingTitle').textContent =
+        type === 'generate'
+            ? 'Generating Full CSV 31 Hari ke Depan'
+            : 'Memproses prediksi model...';
+}
+
+function showProgressToast() {
+    document.getElementById("progressToast").classList.remove("hidden");
+}
+
+function hideProgressToast() {
+    document.getElementById("progressToast").classList.add("hidden");
+}
+
+function updateProgressToast(day, total, eta, elapsed) {
+    const percent = Math.floor((day / total) * 100);
+    document.getElementById("toastBar").style.width = percent + "%";
+    document.getElementById("toastPercent").textContent = percent + "%";
+    document.getElementById("toastStatus").textContent = `Generating Day ${day}/${total}`;
+    document.getElementById("toastETA").textContent = `ETA ${eta} • Elapsed ${elapsed}`;
+}
+
+async function generateCSV() {
+    showLoading('generate');
+    showProgressToast();
+
+    const selectedModel = document.querySelector('input[name="model"]:checked').value;
+    const route = selectedModel === "best" ? "/generate_best" : "/generate_full";
+
+    try {
+        const res  = await fetch(route);
+        const data = await res.json();
+
+        if (data.status === "already_running") {
+            hideProgressToast();
+            alert("Generate masih berjalan, tunggu sebentar.");
+            document.getElementById('stateLoading').classList.add('hidden');
+            document.getElementById('stateIdle').classList.remove('hidden');
+            return;
+        }
+
+        // Mulai polling rekursif
+        _pollActive = true;
+        pollOnce();
+
+    } catch (err) {
+        console.error("Generate error:", err);
+        hideProgressToast();
+        document.getElementById('stateLoading').classList.add('hidden');
+        document.getElementById('stateIdle').classList.remove('hidden');
+        alert("Terjadi kesalahan saat memulai generate.");
+    }
+}
+
+async function pollOnce() {
+    // Kalau sudah di-stop dari luar, berhenti
+    if (!_pollActive) return;
+
+    try {
+        const res  = await fetch("/generate_progress");
+        const prog = await res.json();
+
+        console.log("Poll:", prog);
+
+        // Update UI
+        document.getElementById("loadingTitle").textContent =
+            `Generating Day ${prog.day}/${prog.total}`;
+        updateProgressToast(prog.day, prog.total, prog.eta, prog.elapsed);
+
+        // ── ERROR ──
+        if (prog.error) {
+            _pollActive = false;
+            hideProgressToast();
+            document.getElementById('stateLoading').classList.add('hidden');
+            document.getElementById('stateIdle').classList.remove('hidden');
+            alert("Error: " + prog.error);
+            return; // STOP, tidak jadwal pollOnce lagi
+        }
+
+        // ── DONE ──
+        if (prog.done) {
+            _pollActive = false;
+            hideProgressToast();
+
+            try {
+                // Commit ke session Flask — await sampai benar-benar selesai
+                const commitRes  = await fetch("/generate_commit", { method: "POST" });
+                const commitData = await commitRes.json();
+                console.log("Commit:", commitData);
+            } catch (commitErr) {
+                console.warn("Commit gagal:", commitErr);
+            }
+
+            // Reload setelah commit confirmed selesai
+            window.location.reload();
+            return; // STOP, tidak jadwal pollOnce lagi
+        }
+
+        // ── MASIH RUNNING — jadwal poll berikutnya ──
+        // setTimeout bukan setInterval: poll berikutnya baru dijadwal
+        // SETELAH poll sekarang selesai — tidak ada overlap
+        setTimeout(pollOnce, 1500);
+
+    } catch (pollErr) {
+        console.error("Poll error:", pollErr);
+        _pollActive = false;
+        hideProgressToast();
+        document.getElementById('stateLoading').classList.add('hidden');
+        document.getElementById('stateIdle').classList.remove('hidden');
+        alert("Polling gagal: " + pollErr.message);
+    }
+}
+
+function downloadCSV() {
+    const modeInput = document.getElementById('lastGenerateMode');
+    const mode = modeInput ? modeInput.value : "general";
+    window.location.href = mode === "best" ? "/download_full/best" : "/download_full/general";
+}
+
+async function resetToIdle() {
+    // Hapus dari session Flask dulu
+    try {
+        await fetch("/reset_nlp", { method: "POST" });
+    } catch(e) {
+        console.warn("Reset session gagal:", e);
     }
 
-    function resetToIdle() {
-        const nlpBox = document.getElementById('stateNlp');
-        if (nlpBox) nlpBox.classList.add('hidden');
-        document.getElementById('stateIdle').classList.remove('hidden');
-    }
+    // Baru hide di DOM
+    const nlpBox = document.getElementById('stateNlp');
+    if (nlpBox) nlpBox.classList.add('hidden');
+    document.getElementById('stateIdle').classList.remove('hidden');
+}
 </script>
 </body>
 </html>
