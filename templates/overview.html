@@ -149,6 +149,8 @@
                         <option value="GBR">GBR</option>
                         <option value="XGB">XGBoost</option>
                         <option value="KNN">KNN</option>
+                        <option value="LSTM">LSTM</option>
+                        <option value="BiLSTM">Bi-LSTM</option>
 
                     </select>
 
@@ -165,7 +167,7 @@
                     <div class="flex-1">
 
                       <!-- SUMMARY TEXT -->
-                      <div class="flex items-center justify-between mb-2">
+                      <div class="flex items-center justify-between mb-6">
                         <h3 class="font-semibold text-teal-800">
                           AI Forecast Summary
                         </h3>
@@ -198,9 +200,13 @@ const datasetsMap = {
 
     GBR: JSON.parse('{{ gbr_data | tojson | safe }}'),
     XGB: JSON.parse('{{ xgb_data | tojson | safe }}'),
-    KNN: JSON.parse('{{ knn_data | tojson | safe }}')
+    KNN: JSON.parse('{{ knn_data | tojson | safe }}'),
+
+    LSTM: JSON.parse('{{ lstm_data | tojson | safe }}'),
+    BiLSTM: JSON.parse('{{ bilstm_data | tojson | safe }}')
 
 };
+
 
 let chartInstance = null;
 
@@ -209,30 +215,39 @@ function buildDataset(modelName) {
     const colorMap = {
         GBR: "#14b8a6",
         XGB: "#3b82f6",
-        KNN: "#f59e0b"
+        KNN: "#f59e0b",
+
+        LSTM: "#8b5cf6",
+        BiLSTM: "#ec4899"
     };
 
     return [
 
+        // ======================
         // AKTUAL
+        // ======================
         {
             label: "Aktual",
             data: actualData,
 
-            borderColor: "rgba(17,24,39,0.45)",
-            backgroundColor: "rgba(17,24,39,0.04)",
+            borderColor: "rgba(107,114,128,0.9)",
+            backgroundColor: "rgba(107,114,128,0.08)",
 
             borderWidth: 5,
-            borderDash: [7, 5],
+            borderDash: [10, 6],
 
-            tension: 0.35,
+            tension: 0.4,
             fill: false,
 
             pointRadius: 0,
-            pointHoverRadius: 4
+            pointHoverRadius: 5,
+
+            order: 1
         },
 
+        // ======================
         // MODEL
+        // ======================
         {
             label: modelName,
             data: datasetsMap[modelName],
@@ -242,11 +257,19 @@ function buildDataset(modelName) {
 
             borderWidth: 4,
 
-            tension: 0.35,
+            tension: 0.4,
             fill: false,
 
             pointRadius: 0,
-            pointHoverRadius: 5
+            pointHoverRadius: 5,
+
+            // 🔥 glow effect
+            pointHoverBorderWidth: 3,
+
+            // 🔥 bikin garis lebih "naik"
+            cubicInterpolationMode: 'monotone',
+
+            order: 2
         }
 
     ];
@@ -282,28 +305,55 @@ function renderChart(modelName = "GBR") {
                 intersect: false
             },
 
+            elements: {
+
+                line: {
+                    capBezierPoints: true
+                }
+
+            },
+
             plugins: {
 
                 legend: {
+
                     display: true,
                     position: "top",
 
+                    // disable hide line pas legend diklik
+                    onClick: null,
+
                     labels: {
+
                         usePointStyle: true,
                         pointStyle: "circle",
                         padding: 20,
+
                         font: {
                             size: 12,
                             weight: "600"
                         }
+
                     }
+
                 },
 
                 tooltip: {
-                    backgroundColor: "#111827",
-                    padding: 12,
-                    cornerRadius: 10,
-                    displayColors: true
+
+                    backgroundColor: "#0f172a",
+                    padding: 14,
+                    cornerRadius: 12,
+
+                    callbacks: {
+
+                        label: function(context) {
+
+                            return `${context.dataset.label}: ${context.raw.toFixed(3)} m/s`;
+
+                        }
+
+                    }
+
                 }
 
             },
@@ -311,6 +361,7 @@ function renderChart(modelName = "GBR") {
             scales: {
 
                 x: {
+
                     grid: {
                         display: false
                     },
@@ -318,6 +369,7 @@ function renderChart(modelName = "GBR") {
                     ticks: {
                         maxTicksLimit: 10
                     }
+
                 },
 
                 y: {
@@ -327,9 +379,11 @@ function renderChart(modelName = "GBR") {
                     },
 
                     ticks: {
+
                         callback: function(value) {
                             return value + " m/s";
                         }
+
                     }
 
                 }
@@ -344,6 +398,9 @@ function renderChart(modelName = "GBR") {
 
 // DEFAULT
 renderChart("GBR");
+
+// reset dropdown ke GBR saat reload
+document.getElementById("modelSelector").value = "GBR";
 
 // DROPDOWN CHANGE
 document

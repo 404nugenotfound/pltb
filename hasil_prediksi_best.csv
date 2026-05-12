@@ -1,21 +1,11 @@
 ﻿-BEGIN HEADER-
-NASA/POWER Prediction Result
-Source: XGB-LSTM Stacking Forecast
-Location: Bawean (Latitude: -5.75, Longitude: 112.65)
-Parameter(s):
-WS10M  Wind Speed at 10 Meters (m/s)
-
-Stacking Metrics:
-MAE: 0.084 | RMSE: 0.118 | MAPE: 3.55% | R2: 0.997
-
-Forecast Summary (AI Generated):
+Dataset: NASA Bawean Hourly Full.csv
+Stacking Metrics: MAE=0.084 RMSE=0.118 MAPE=3.55% R2=0.997
+Forecast Summary:
 Prediksi kecepatan angin di Pulau Bawean untuk periode Januari 2025 menunjukkan rata-rata 11.67 m/s, termasuk kategori angin kencang (near gale or above). Kecepatan tertinggi mencapai 22.11 m/s dan terendah 2.93 m/s dengan standar deviasi 6.35 m/s. Angin cenderung terkencang sekitar pukul 19:00 dan terlemah sekitar pukul 18:00. Tren keseluruhan: meningkat menuju akhir periode. 
 
 Model terbaik adalah XGB-LSTM Stacking dengan MAPE 3.55% dan RMSE 0.118. Tingkat akurasi: tinggi.
 
-Notes:
-Prediction uses recursive forecasting method
-Long horizon prediction may become smooth due to error accumulation
 -END HEADER-
 
 YEAR;MO;DY;HR;WS10M;XGB_Base;XGB_LSTM_Stacked
