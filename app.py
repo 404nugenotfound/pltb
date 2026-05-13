@@ -234,7 +234,8 @@ def init_dl_models(df_ref):
 # =========================
 # INIT DL
 # =========================
-dl_result = init_dl_models(df)
+(lstm, bilstm, scaler_X, scaler_y,
+ X_scaled, data_seq, DL_INPUT_COLS, DL_READY) = init_dl_models(df)
 
 # =========================
 # VALIDASI CSV UPLOAD
@@ -393,7 +394,7 @@ def generate_nlp_report(stats: dict, best_model_name: str, best_met: dict) -> st
         f"Tren keseluruhan: {stats['trend']}. "
         f"\n\nModel terbaik adalah {best_model_name} "
         f"dengan MAPE {mape_str} dan RMSE {rmse_str}. "
-        f"Tingkat akurasi: {akurasi}."
+        f"Tingkat akurasi: {akurasi}." 
     )
 
 
@@ -495,8 +496,8 @@ def _worker_retrain(dataset_path: str) -> None:
                 Dense(1)
             ])
             _lstm_m.compile(optimizer="adam", loss="mse")
-            _lstm_m.fit(_seqs, _targets, epochs=50, batch_size=64,
-                        validation_split=0.1, callbacks=[es], verbose=0)
+            _lstm_m.fit(_seqs, _targets, epochs=20, batch_size=128,
+                        validation_split=0.1, callbacks=[es], verbose=1)
             _lstm_m.save(f"{MODEL_FOLDER}/lstm.h5")
             log("✅ LSTM selesai")
 
@@ -509,8 +510,8 @@ def _worker_retrain(dataset_path: str) -> None:
                 Dense(1)
             ])
             _bilstm_m.compile(optimizer="adam", loss="mse")
-            _bilstm_m.fit(_seqs, _targets, epochs=50, batch_size=64,
-                          validation_split=0.1, callbacks=[es], verbose=0)
+            _bilstm_m.fit(_seqs, _targets, epochs=20, batch_size=128,
+                          validation_split=0.1, callbacks=[es], verbose=1)
             _bilstm_m.save(f"{MODEL_FOLDER}/bilstm.h5")
             log("✅ BiLSTM selesai")
 
@@ -564,40 +565,44 @@ def _worker_retrain(dataset_path: str) -> None:
 def upload_dataset():
 
     # =========================
+    # CEK TRAINING SEDANG JALAN
+    # =========================
+    with train_lock:
+        if train_progress.get("running"):
+            return jsonify({
+                "status":  "error",
+                "message": "Training sedang berjalan, tunggu selesai dulu."
+            }), 409
+
+    # =========================
     # VALIDASI FILE
     # =========================
     if "dataset" not in request.files:
         return jsonify({
-            "status": "error",
+            "status":  "error",
             "message": "Tidak ada dataset"
         }), 400
 
-    file = request.files["dataset"]
-
+    file         = request.files["dataset"]
     raw_filename = file.filename or ""
 
     if raw_filename == "":
         return jsonify({
-            "status": "error",
+            "status":  "error",
             "message": "Filename kosong"
         }), 400
 
     if not allowed_file(raw_filename):
         return jsonify({
-            "status": "error",
+            "status":  "error",
             "message": "File harus .csv"
         }), 400
 
     # =========================
-    # SAVE FILE
+    # SAVE FILE SEMENTARA
     # =========================
-    filename = secure_filename(raw_filename)
-
-    pending_path = os.path.join(
-        UPLOAD_FOLDER,
-        f"pending_{filename}"
-    )
-
+    filename     = secure_filename(raw_filename)
+    pending_path = os.path.join(UPLOAD_FOLDER, f"pending_{filename}")
     file.save(pending_path)
 
     # =========================
@@ -606,35 +611,50 @@ def upload_dataset():
     validation = validate_csv(pending_path)
 
     if not validation["valid"]:
-
-        # hapus file invalid
-        if os.path.exists(pending_path):
-            os.remove(pending_path)
-
+        os.remove(pending_path)
         return jsonify({
             "status": "invalid",
             "errors": validation["errors"],
-            "info": validation["info"]
+            "info":   validation["info"]
         }), 422
 
     # =========================
-    # FINAL PATH
+    # ARSIP DATASET LAMA
     # =========================
-    final_name = os.path.basename(pending_path).replace("pending_", "")
-    final_path = os.path.join(UPLOAD_FOLDER, final_name)
+    current_path = get_active_dataset_path()
+    if (
+        current_path
+        and os.path.exists(current_path)
+        and current_path != DEFAULT_DATASET
+    ):
+        archive_name = f"archive_{int(time.time())}_{os.path.basename(current_path)}"
+        shutil.move(current_path, os.path.join(ARCHIVE_FOLDER, archive_name))
+        print(f"📦 Dataset lama diarsip: {archive_name}")
 
+    # =========================
+    # PENDING → FINAL
+    # =========================
+    final_path = os.path.join(UPLOAD_FOLDER, filename)
     shutil.move(pending_path, final_path)
 
     # =========================
-    # START AUTO TRAINING
+    # UPDATE ACTIVE DATASET — SEBELUM TRAINING
+    # Ini kunci utamanya: path diupdate dulu
+    # supaya generate forecast tidak baca dataset lama
+    # =========================
+    set_active_dataset_path(final_path)
+    print(f"✅ Active dataset → {final_path}")
+
+    # =========================
+    # START TRAINING
     # =========================
     with train_lock:
         train_progress.update({
             "running": True,
-            "step": "Memulai training...",
-            "done": False,
-            "error": None,
-            "log": []
+            "step":    "Memulai training...",
+            "done":    False,
+            "error":   None,
+            "log":     []
         })
 
     threading.Thread(
@@ -647,12 +667,11 @@ def upload_dataset():
     # RESPONSE
     # =========================
     return jsonify({
-        "status": "valid",
+        "status":   "started",
         "filename": filename,
-        "info": validation["info"],
-        "message": "Dataset valid. Training model dimulai..."
+        "info":     validation["info"],
+        "message":  "Dataset valid. Training model dimulai..."
     })
-
 
 @app.route("/start_training", methods=["POST"])
 def start_training():
