@@ -22,7 +22,7 @@ import traceback
 generate_progress: dict = {
     "running":    False,
     "day":        0,
-    "total":      31,
+    "total":      7,
     "mode":       "",
     "start_time": 0.0,
     "done":       False,
@@ -334,67 +334,159 @@ print(f"✅ Metrics siap — ML: {list(metrics.keys())} | DL: {list(metrics_dl.k
 def get_best_ml_and_dl(m_ml: dict, m_dl: dict) -> list:
     best_ml = min(m_ml, key=lambda m: m_ml[m]["MAPE"])
     result  = [best_ml]
+
     if m_dl:
         best_dl = min(m_dl, key=lambda m: m_dl[m]["MAPE"])
         result.append(best_dl)
+
     return result
 
 
 def build_forecast_text(df_future: pd.DataFrame) -> dict:
+
     avg     = float(df_future[TARGET].mean())
     max_val = float(df_future[TARGET].max())
     min_val = float(df_future[TARGET].min())
     std_val = float(df_future[TARGET].std())
+
     hourly  = df_future.groupby("HR")[TARGET].mean()
     peak_hr = int(hourly.idxmax())
     low_hr  = int(hourly.idxmin())
-    week1   = float(df_future.iloc[:168][TARGET].mean()) if len(df_future) >= 168 else avg
-    week4   = float(df_future.iloc[-168:][TARGET].mean()) if len(df_future) >= 168 else avg
 
-    if week4 > week1 + 0.1:   trend = "meningkat menuju akhir periode"
-    elif week4 < week1 - 0.1: trend = "menurun menuju akhir periode"
-    else:                      trend = "relatif stabil sepanjang periode"
+    # =========================
+    # DETEKSI RENTANG TANGGAL
+    # =========================
+    start_row = df_future.iloc[0]
+    end_row   = df_future.iloc[-1]
 
-    if avg < 1.5:    category = "tenang (calm)"
-    elif avg < 3.3:  category = "angin sepoi ringan (light breeze)"
-    elif avg < 5.5:  category = "angin sedang (gentle to moderate breeze)"
-    elif avg < 8.0:  category = "angin segar (fresh to strong breeze)"
-    else:            category = "angin kencang (near gale or above)"
+    start_date = (
+        f"{int(start_row['DY']):02d}-"
+        f"{int(start_row['MO']):02d}-"
+        f"{int(start_row['YEAR'])}"
+    )
+
+    end_date = (
+        f"{int(end_row['DY']):02d}-"
+        f"{int(end_row['MO']):02d}-"
+        f"{int(end_row['YEAR'])}"
+    )
+
+    # =========================
+    # TREND
+    # =========================
+    split_idx = len(df_future) // 2
+
+    first_half = float(df_future.iloc[:split_idx][TARGET].mean())
+    second_half = float(df_future.iloc[split_idx:][TARGET].mean())
+
+    if second_half > first_half + 0.1:
+        trend = "meningkat menuju akhir periode"
+
+    elif second_half < first_half - 0.1:
+        trend = "menurun menuju akhir periode"
+
+    else:
+        trend = "relatif stabil sepanjang periode"
+
+    # =========================
+    # KATEGORI ANGIN
+    # =========================
+    if avg < 1.5:
+        category = "tenang (calm)"
+
+    elif avg < 3.3:
+        category = "angin sepoi ringan (light breeze)"
+
+    elif avg < 5.5:
+        category = "angin sedang (gentle to moderate breeze)"
+
+    elif avg < 8.0:
+        category = "angin segar (fresh breeze)"
+
+    else:
+        category = "angin kencang (strong breeze)"
 
     return {
-        "avg": avg, "max_val": max_val, "min_val": min_val,
-        "std_val": std_val, "peak_hr": peak_hr, "low_hr": low_hr,
-        "trend": trend, "category": category
+        "avg": avg,
+        "max_val": max_val,
+        "min_val": min_val,
+        "std_val": std_val,
+        "peak_hr": peak_hr,
+        "low_hr": low_hr,
+        "trend": trend,
+        "category": category,
+        "start_date": start_date,
+        "end_date": end_date
     }
 
 
-def generate_nlp_report(stats: dict, best_model_name: str, best_met: dict) -> str:
-    mape_raw = str(best_met.get("MAPE", "-")).replace(",", ".").replace("%", "").strip()
-    rmse_raw = str(best_met.get("RMSE", "-")).replace(",", ".").strip()
+def generate_nlp_report(
+    stats: dict,
+    best_model_name: str,
+    best_met: dict
+) -> str:
+
+    mape_raw = str(best_met.get("MAPE", "-")) \
+        .replace(",", ".") \
+        .replace("%", "") \
+        .strip()
+
+    rmse_raw = str(best_met.get("RMSE", "-")) \
+        .replace(",", ".") \
+        .strip()
 
     if mape_raw.lower() in ("-", "", "nan", "none"):
+
         mape_str = "N/A"
         akurasi  = "tidak tersedia"
+
     else:
+
         mape     = float(mape_raw)
-        akurasi  = "tinggi" if mape < 10 else "cukup" if mape < 20 else "rendah"
         mape_str = f"{mape:.2f}%"
 
-    rmse_str = "N/A" if rmse_raw.lower() in ("-", "", "nan", "none") else rmse_raw
+        if mape < 10:
+            akurasi = "tinggi"
+
+        elif mape < 20:
+            akurasi = "cukup"
+
+        else:
+            akurasi = "rendah"
+
+    rmse_str = (
+        "N/A"
+        if rmse_raw.lower() in ("-", "", "nan", "none")
+        else rmse_raw
+    )
 
     return (
-        f"Prediksi kecepatan angin di Pulau Bawean untuk periode Januari 2025 "
+        f"Prediksi kecepatan angin untuk periode "
+        f"{stats['start_date']} hingga {stats['end_date']} "
         f"menunjukkan rata-rata {stats['avg']:.2f} m/s, "
         f"termasuk kategori {stats['category']}. "
-        f"Kecepatan tertinggi mencapai {stats['max_val']:.2f} m/s "
-        f"dan terendah {stats['min_val']:.2f} m/s "
-        f"dengan standar deviasi {stats['std_val']:.2f} m/s. "
-        f"Angin cenderung terkencang sekitar pukul {stats['peak_hr']:02d}:00 "
-        f"dan terlemah sekitar pukul {stats['low_hr']:02d}:00. "
-        f"Tren keseluruhan: {stats['trend']}. "
-        f"\n\nModel terbaik adalah {best_model_name} "
-        f"dengan MAPE {mape_str} dan RMSE {rmse_str}. "
-        f"Tingkat akurasi: {akurasi}." 
+
+        f"Kecepatan tertinggi mencapai "
+        f"{stats['max_val']:.2f} m/s "
+        f"dan terendah {stats['min_val']:.2f} m/s, "
+        f"dengan standar deviasi "
+        f"{stats['std_val']:.2f} m/s. "
+
+        f"Angin cenderung paling kuat sekitar pukul "
+        f"{stats['peak_hr']:02d}:00 "
+        f"dan paling lemah sekitar pukul "
+        f"{stats['low_hr']:02d}:00. "
+
+        f"Secara umum tren angin "
+        f"{stats['trend']}. "
+
+        f"\n\nModel terbaik adalah "
+        f"{best_model_name} "
+        f"dengan MAPE {mape_str} "
+        f"dan RMSE {rmse_str}. "
+
+        f"Tingkat akurasi model tergolong "
+        f"{akurasi}."
     )
 
 
@@ -854,7 +946,7 @@ def get_progress():
         p = generate_progress.copy()
     elapsed = time.time() - p["start_time"] if p.get("start_time") else 0
     day     = p.get("day", 0)
-    total   = p.get("total", 31)
+    total   = p.get("total", 7)
     eta_str = (
         f"{int(max(0,(total-day)*(elapsed/day))//60)}m "
         f"{int(max(0,(total-day)*(elapsed/day))%60)}s"
@@ -930,7 +1022,7 @@ def _worker_generate_full(selected_model: str, active_models: list) -> None:
             if "BiLSTM" in active_models:
                 df_out.loc[df_out.index[STEP:], "BiLSTM"] = bilstm_preds
                 
-        future_steps  = 24 * 31
+        future_steps  = 24 * 7
         target_series = df[TARGET].tolist()
         last_row_dict = df.iloc[-1].to_dict()
         last_time     = pd.Timestamp(
@@ -944,7 +1036,7 @@ def _worker_generate_full(selected_model: str, active_models: list) -> None:
             if i % 24 == 0:
                 with progress_lock:
                     generate_progress["day"] = (i // 24) + 1
-                print(f"⏳ Day {(i//24)+1}/31")
+                print(f"⏳ Day {(i//24)+1}/7")
 
             next_time = last_time + pd.Timedelta(hours=i + 1)
             lag1  = target_series[-1];  lag2  = target_series[-2]
@@ -1087,7 +1179,7 @@ def _worker_generate_best() -> None:
         )
         print(f"📊 Stacking Metrics: {stacking_metrics}")
 
-        future_steps  = 24 * 31
+        future_steps  = 24 * 7
         target_series = df[TARGET].tolist()
         last_row_dict = df.iloc[-1].to_dict()
         last_time     = pd.Timestamp(
@@ -1101,7 +1193,7 @@ def _worker_generate_best() -> None:
             if i % 24 == 0:
                 with progress_lock:
                     generate_progress["day"] = (i // 24) + 1
-                print(f"⏳ Day {(i//24)+1}/31")
+                print(f"⏳ Day {(i//24)+1}/7")
 
             next_time = last_time + pd.Timedelta(hours=i + 1)
             lag1  = target_series[-1];  lag2  = target_series[-2]
@@ -1208,7 +1300,7 @@ def generate_full():
     )
     with progress_lock:
         generate_progress.update({
-            "running": True, "day": 0, "total": 31, "mode": "General",
+            "running": True, "day": 0, "total": 7, "mode": "General",
             "start_time": time.time(), "done": False, "nlp_report": None, "error": None
         })
     threading.Thread(target=_worker_generate_full,
@@ -1223,7 +1315,7 @@ def generate_best():
             return jsonify({"status": "already_running"}), 409
     with progress_lock:
         generate_progress.update({
-            "running": True, "day": 0, "total": 31, "mode": "Best Stacking",
+            "running": True, "day": 0, "total": 7, "mode": "Best Stacking",
             "start_time": time.time(), "done": False, "nlp_report": None, "error": None
         })
     threading.Thread(target=_worker_generate_best, daemon=True).start()
