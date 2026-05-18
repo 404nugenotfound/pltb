@@ -1,0 +1,7 @@
+{
+  "e76c13204b9bfe7905d4ce7f6e50a38f": {
+    "trained_at": "2026-05-17 21:51",
+    "dataset_name": "NASA_Bawean_Hourly.csv",
+    "snap_dir": "models\\snap_e76c13204b9b"
+  }
+}

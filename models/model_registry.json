@@ -1,0 +1,7 @@
+{
+  "53b06f808d69f3ff16fb562e9ad2c7e1": {
+    "trained_at": "2026-05-17 19:49",
+    "dataset_name": "NASA_Sukabumi_Hourly.csv",
+    "snap_dir": "models\\snap_53b06f808d69"
+  }
+}

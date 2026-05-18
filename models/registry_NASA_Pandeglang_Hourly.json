@@ -1,0 +1,7 @@
+{
+  "da6619f323a2c3b9757ffaa8128839c5": {
+    "trained_at": "2026-05-18 16:33",
+    "dataset_name": "NASA_Pandeglang_Hourly.csv",
+    "snap_dir": "models\\snap_da6619f323a2"
+  }
+}

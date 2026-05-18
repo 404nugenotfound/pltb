@@ -15,6 +15,53 @@ from werkzeug.utils import secure_filename
 import xgboost as xgb_lib
 from typing import Any, Optional
 import traceback
+import hashlib
+
+# =========================
+# DATASET HASH & MODEL REGISTRY
+# =========================
+
+def compute_file_hash(path: str, chunk_size: int = 65536) -> str:
+    """MD5 hash dari file CSV."""
+    h = hashlib.md5()
+    with open(path, "rb") as f:
+        while chunk := f.read(chunk_size):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def get_registry_path(dataset_path: str = "") -> str:
+    if not dataset_path:
+        dataset_path = get_active_dataset_path()
+    name = os.path.basename(dataset_path).replace(".csv", "")
+    return os.path.join(MODEL_FOLDER, f"registry_{name}.json")
+
+
+def load_model_registry(dataset_path: str = "") -> dict:
+    path = get_registry_path(dataset_path)
+    if os.path.exists(path):
+        try:
+            with open(path, "r") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def save_model_registry(registry: dict, dataset_path: str = "") -> None:
+    path = get_registry_path(dataset_path)
+    with open(path, "w") as f:
+        json.dump(registry, f, indent=2)
+
+
+def is_dataset_already_trained(dataset_path: str) -> tuple[bool, str]:
+    """Returns (sudah_pernah_train, file_hash)."""
+    file_hash = compute_file_hash(dataset_path)
+    registry  = load_model_registry(dataset_path)
+    return file_hash in registry, file_hash
+
+def get_model_dir_for_hash(file_hash: str) -> str:
+    return os.path.join(MODEL_FOLDER, f"snap_{file_hash[:12]}")
 
 # =========================
 # PROGRESS TRACKER
@@ -61,7 +108,6 @@ TARGET                  = "WS10M"
 DEFAULT_DATASET         = "Dataset/NASA Bawean Hourly Full.csv"
 ACTIVE_DATASET_FILE     = os.path.join(UPLOAD_FOLDER, "active_dataset.txt")
 REQUIRED_COLUMNS        = ["YEAR", "MO", "DY", "HR", "WS10M"]
-METRICS_CACHE           = f"{MODEL_FOLDER}/metrics_cache.json"
 STEP: int               = 48
 
 # =========================
@@ -108,19 +154,38 @@ print(f"✅ Dataset loaded: {_dataset_path} ({len(df)} rows)")
 # LOAD MODEL ML
 # =========================
 def load_ml_models() -> tuple:
-    _gbr    = joblib.load(f"{MODEL_FOLDER}/gbr.pkl")
-    _xgb    = joblib.load(f"{MODEL_FOLDER}/xgb.pkl")
-    _knn    = joblib.load(f"{MODEL_FOLDER}/knn.pkl")
-    _scaler = joblib.load(f"{MODEL_FOLDER}/scaler.pkl")
-    _feats  = joblib.load(f"{MODEL_FOLDER}/features.pkl")
-    return _gbr, _xgb, _knn, _scaler, _feats
+    try:
+        _gbr    = joblib.load(f"{MODEL_FOLDER}/gbr.pkl")
+        _xgb    = joblib.load(f"{MODEL_FOLDER}/xgb.pkl")
+        _knn    = joblib.load(f"{MODEL_FOLDER}/knn.pkl")
+        _scaler = joblib.load(f"{MODEL_FOLDER}/scaler.pkl")
+        _feats  = joblib.load(f"{MODEL_FOLDER}/features.pkl")
+        return _gbr, _xgb, _knn, _scaler, _feats
+    except Exception as e:
+        print(f"⚠️ Model ML tidak tersedia: {e}")
+        return None, None, None, None, []
 
 
 gbr, xgb, knn, scaler, FEATURES = load_ml_models()
 
-X       = np.array(df[FEATURES].values)
-y       = np.array(df[TARGET].values)
-data_ml = X[-1].reshape(1, -1)
+ML_READY = all([
+    gbr     is not None,
+    xgb     is not None,
+    knn     is not None,
+    scaler  is not None,
+    len(FEATURES) > 0
+])
+
+if ML_READY:
+    X       = np.array(df[FEATURES].values)
+    y       = np.array(df[TARGET].values)
+    data_ml = X[-1].reshape(1, -1)
+    print("✅ ML models loaded")
+else:
+    print("⚠️ ML models belum ada — upload dataset untuk training")
+    X       = np.array([])
+    y       = np.array([])
+    data_ml = None
 
 # =========================
 # DL SETUP
@@ -290,12 +355,18 @@ def get_metrics(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
 
 
 def _compute_metrics_fresh() -> tuple:
+    if not ML_READY:
+        print("⚠️ Skip metrics — model belum tersedia")
+        return {}, {}
+    
+    global metrics, metrics_dl
+    
     print("📊 Hitung metrics ML...")
-    ml = {
-        "GBR": get_metrics(y, gbr.predict(X)),
-        "XGB": get_metrics(y, xgb.predict(X)),
-        "KNN": get_metrics(y, knn.predict(scaler.transform(X)))
-    }
+    ml: dict = {}
+    if gbr   is not None: ml["GBR"] = get_metrics(y, gbr.predict(X))
+    if xgb   is not None: ml["XGB"] = get_metrics(y, xgb.predict(X))
+    if knn   is not None and scaler is not None: ml["KNN"] = get_metrics(y, knn.predict(scaler.transform(X)))
+
     dl: dict = {}
     if DL_READY and X_scaled is not None:
         print("📊 Hitung metrics DL...")
@@ -309,36 +380,90 @@ def _compute_metrics_fresh() -> tuple:
     return ml, dl
 
 
+# =========================
+# METRICS CACHE — per dataset
+# =========================
+def get_metrics_cache_path(dataset_path: str = "") -> str:
+    """Cache path unik per dataset."""
+    if not dataset_path:
+        dataset_path = get_active_dataset_path()
+    name = os.path.basename(dataset_path).replace(".csv", "")
+    return os.path.join(MODEL_FOLDER, f"cache_{name}.json")
+
+
+def get_model_cache_dir(dataset_path: str = "") -> str:
+    """Folder model per dataset."""
+    if not dataset_path:
+        dataset_path = get_active_dataset_path()
+    name = os.path.basename(dataset_path).replace(".csv", "")
+    return os.path.join(MODEL_FOLDER, f"models_{name}")
+
+
 def load_or_compute_metrics() -> tuple:
-    if os.path.exists(METRICS_CACHE):
-        print("⚡ Load metrics dari cache...")
-        with open(METRICS_CACHE, "r") as f:
-            cache = json.load(f)
-        if DL_READY and not cache.get("dl"):
-            os.remove(METRICS_CACHE)
-            return load_or_compute_metrics()
-        return cache["ml"], cache.get("dl", {})
+    if not ML_READY:
+        print("⚠️ Skip load metrics — model belum tersedia")
+        return {}, {}
+
+    cache_path = get_metrics_cache_path()
+
+    # =========================
+    # LOAD CACHE
+    # =========================
+    if os.path.exists(cache_path):
+        try:
+            with open(cache_path, "r") as f:
+                cache = json.load(f)
+
+            print(f"⚡ Load metrics dari cache: {os.path.basename(cache_path)}")
+
+            if DL_READY and not cache.get("dl"):
+                print("🔄 Cache tidak ada DL metrics, hitung ulang...")
+                os.remove(cache_path)
+            else:
+                return cache["ml"], cache.get("dl", {})
+
+        except Exception as e:
+            print(f"❌ Cache rusak: {e}")
+            if os.path.exists(cache_path):
+                os.remove(cache_path)
+
+    # =========================
+    # COMPUTE BARU
+    # =========================
     print("🆕 Hitung metrics pertama kali...")
     ml, dl = _compute_metrics_fresh()
-    with open(METRICS_CACHE, "w") as f:
+
+    with open(cache_path, "w") as f:
         json.dump({"ml": ml, "dl": dl}, f, indent=2)
+
+    print(f"✅ Cache disimpan: {os.path.basename(cache_path)}")
     return ml, dl
 
+# =========================
+# INISIALISASI METRICS
+# =========================
+metrics = {}
+metrics_dl = {}
 
 metrics, metrics_dl = load_or_compute_metrics()
-print(f"✅ Metrics siap — ML: {list(metrics.keys())} | DL: {list(metrics_dl.keys())}")
+
+print(
+    f"✅ Metrics siap — "
+    f"ML: {list(metrics.keys())} | "
+    f"DL: {list(metrics_dl.keys())}"
+)
 
 # =========================
 # HELPER FUNCTIONS
 # =========================
 def get_best_ml_and_dl(m_ml: dict, m_dl: dict) -> list:
+    if not m_ml:
+        return []
     best_ml = min(m_ml, key=lambda m: m_ml[m]["MAPE"])
     result  = [best_ml]
-
     if m_dl:
         best_dl = min(m_dl, key=lambda m: m_dl[m]["MAPE"])
         result.append(best_dl)
-
     return result
 
 
@@ -493,10 +618,11 @@ def generate_nlp_report(
 # =========================
 # BACKGROUND WORKER — RETRAIN SEMUA MODEL
 # =========================
-def _worker_retrain(dataset_path: str) -> None:
+def _worker_retrain(dataset_path: str, file_hash: str = "") -> None:
     global df, X, y, data_ml, gbr, xgb, knn, scaler, FEATURES
     global lstm, bilstm, scaler_X, scaler_y, X_scaled, data_seq
     global DL_INPUT_COLS, DL_READY, metrics, metrics_dl
+    global ML_READY
 
     def log(msg: str) -> None:
         print(msg)
@@ -625,16 +751,43 @@ def _worker_retrain(dataset_path: str) -> None:
         knn      = _knn
         scaler   = _scaler
         FEATURES = _features
+        ML_READY = True  # ← tambah ini
 
         (lstm, bilstm, scaler_X, scaler_y,
          X_scaled, data_seq, DL_INPUT_COLS, DL_READY) = init_dl_models(df)
 
-        if os.path.exists(METRICS_CACHE):
-            os.remove(METRICS_CACHE)
+        _mc = get_metrics_cache_path()
+        if os.path.exists(_mc):
+            os.remove(_mc)
+
         metrics, metrics_dl = load_or_compute_metrics()
-        set_active_dataset_path(dataset_path)
+        print(f"✅ Metrics siap — ML: {list(metrics.keys())} | DL: {list(metrics_dl.keys())}")
 
         log("🎉 Retrain selesai!")
+        
+        # ─── SIMPAN SNAPSHOT MODEL ───
+        if file_hash:
+            snap_dir = get_model_dir_for_hash(file_hash)
+            os.makedirs(snap_dir, exist_ok=True)
+            for fname in ["gbr.pkl", "xgb.pkl", "knn.pkl", "scaler.pkl", "features.pkl",
+                          "scaler_X.pkl", "scaler_y.pkl", "lstm.h5", "bilstm.h5"]:
+                src = os.path.join(MODEL_FOLDER, fname)
+                if os.path.exists(src):
+                    shutil.copy2(src, os.path.join(snap_dir, fname))
+
+            cache_src = get_metrics_cache_path(dataset_path)
+            if os.path.exists(cache_src):
+                shutil.copy2(cache_src, os.path.join(snap_dir, "metrics_cache.json"))
+
+            registry = load_model_registry()
+            registry[file_hash] = {
+                "trained_at":   pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+                "dataset_name": os.path.basename(dataset_path),
+                "snap_dir":     snap_dir
+            }
+            save_model_registry(registry)
+            log(f"📸 Snapshot disimpan: {snap_dir}")
+            
         with train_lock:
             train_progress.update({
                 "running": False, "done": True,
@@ -649,7 +802,29 @@ def _worker_retrain(dataset_path: str) -> None:
                 "error": str(e), "step": "Error"
             })
 
+# =========================
+# RELOAD ALL GLOBALS (tanpa retrain)
+# =========================
+def _reload_all_globals(dataset_path: str) -> None:
+    global df, X, y, data_ml, gbr, xgb, knn, scaler, FEATURES
+    global lstm, bilstm, scaler_X, scaler_y, X_scaled, data_seq
+    global DL_INPUT_COLS, DL_READY, ML_READY, metrics, metrics_dl
 
+    df                       = load_and_engineer(dataset_path)
+    gbr, xgb, knn, scaler, FEATURES = load_ml_models()
+    ML_READY                 = all([gbr, xgb, knn, scaler, len(FEATURES) > 0])
+
+    if ML_READY:
+        X       = np.array(df[FEATURES].values)
+        y       = np.array(df[TARGET].values)
+        data_ml = X[-1].reshape(1, -1)
+
+    (lstm, bilstm, scaler_X, scaler_y,
+     X_scaled, data_seq, DL_INPUT_COLS, DL_READY) = init_dl_models(df)
+
+    metrics, metrics_dl = load_or_compute_metrics()
+    print(f"♻️  Globals reloaded — ML: {list(metrics.keys())} | DL: {list(metrics_dl.keys())}")
+    
 # =========================
 # ROUTES — UPLOAD & TRAINING
 # =========================
@@ -738,7 +913,35 @@ def upload_dataset():
     print(f"✅ Active dataset → {final_path}")
 
     # =========================
-    # START TRAINING
+    # CEK APAKAH DATASET SUDAH PERNAH DI-TRAIN
+    # =========================
+    already_trained, file_hash = is_dataset_already_trained(final_path)
+
+    if already_trained:
+        snap_dir = get_model_dir_for_hash(file_hash)
+        registry = load_model_registry()
+        entry    = registry[file_hash]
+
+        if os.path.exists(snap_dir):
+            for fname in os.listdir(snap_dir):
+                shutil.copy2(
+                    os.path.join(snap_dir, fname),
+                    os.path.join(MODEL_FOLDER, fname)
+                )
+
+        _reload_all_globals(final_path)
+
+        return jsonify({
+            "status":       "skipped",
+            "filename":     filename,
+            "info":         validation["info"],
+            "message":      f"Dataset ini sudah pernah di-train ({entry['trained_at']}). Model langsung dimuat.",
+            "trained_at":   entry["trained_at"],
+            "dataset_hash": file_hash[:12]
+        })
+
+    # =========================
+    # START TRAINING (dataset baru)
     # =========================
     with train_lock:
         train_progress.update({
@@ -746,12 +949,13 @@ def upload_dataset():
             "step":    "Memulai training...",
             "done":    False,
             "error":   None,
-            "log":     []
+            "log":     [],
+            "dataset_hash": file_hash
         })
 
     threading.Thread(
         target=_worker_retrain,
-        args=(final_path,),
+        args=(final_path, file_hash),
         daemon=True
     ).start()
 
@@ -762,7 +966,8 @@ def upload_dataset():
         "status":   "started",
         "filename": filename,
         "info":     validation["info"],
-        "message":  "Dataset valid. Training model dimulai..."
+        "message":  "Dataset valid. Training model dimulai...",
+        "already_trained": False
     })
 
 @app.route("/start_training", methods=["POST"])
@@ -828,6 +1033,25 @@ def dataset_info():
 # =========================
 @app.route("/", methods=["GET", "POST"])
 def index():
+    # Kalau model belum ada, tampilkan halaman upload
+    if not ML_READY:
+        return render_template(
+            "index.html",
+            result=[],
+            all_metrics={},
+            metrics={},
+            selected_model="all",
+            nlp_report=None,
+            last_generate_mode="general",
+            best_model_names=[],
+            ordered_models=[],
+            dataset_name=os.path.basename(get_active_dataset_path()),
+            is_custom_dataset=False,
+            ml_ready=False
+        )
+    
+    global metrics, metrics_dl
+        
     result:       list = []
     selected_model: str = session.get("selected_model", "all")
     nlp_report          = session.get("nlp_report", None)
@@ -865,9 +1089,10 @@ def index():
                 "error":      round(abs(float(pred) - actual), 3)
             })
 
-        if "GBR" in active_models: add_row("GBR", gbr.predict(data_ml)[0])
-        if "XGB" in active_models: add_row("XGB", xgb.predict(data_ml)[0])
-        if "KNN" in active_models: add_row("KNN", knn.predict(scaler.transform(data_ml))[0])
+        if ML_READY and data_ml is not None and gbr is not None and xgb is not None and knn is not None and scaler is not None:
+            if "GBR" in active_models: add_row("GBR", gbr.predict(data_ml)[0])
+            if "XGB" in active_models: add_row("XGB", xgb.predict(data_ml)[0])
+            if "KNN" in active_models: add_row("KNN", knn.predict(scaler.transform(data_ml))[0])
 
         if DL_READY and data_seq is not None:
             if "LSTM"   in active_models:
@@ -896,6 +1121,7 @@ def index():
 
 @app.route("/overview", methods=["GET", "POST"])
 def overview():
+    global metrics, metrics_dl
     selected_model   = session.get("selected_model", "all")
     nlp_report       = session.get("nlp_report", None)
     all_metrics      = {**metrics, **metrics_dl}
@@ -903,9 +1129,9 @@ def overview():
     all_keys         = list(metrics.keys()) + list(metrics_dl.keys())
     labels           = [f"{i}:00" for i in range(24)]
     actual_data      = y[-24:].tolist()
-    gbr_data         = gbr.predict(X[-24:]).tolist()
-    xgb_data         = xgb.predict(X[-24:]).tolist()
-    knn_data         = knn.predict(scaler.transform(X[-24:])).tolist()
+    gbr_data  = gbr.predict(X[-24:]).tolist()  if ML_READY and gbr  is not None and len(X) > 0 else []
+    xgb_data  = xgb.predict(X[-24:]).tolist()  if ML_READY and xgb  is not None and len(X) > 0 else []
+    knn_data  = knn.predict(scaler.transform(X[-24:])).tolist() if ML_READY and knn is not None and scaler is not None and len(X) > 0 else []
 
     return render_template(
         "overview.html",
@@ -934,6 +1160,48 @@ def reset_nlp():
     session.pop("nlp_report", None)
     session.pop("last_generate_mode", None)
     session.modified = True
+    return jsonify({"status": "ok"})
+
+@app.route("/reset_dataset", methods=["POST"])
+def reset_dataset():
+    global df, X, y, data_ml, gbr, xgb, knn, scaler, FEATURES
+    global lstm, bilstm, scaler_X, scaler_y, X_scaled, data_seq
+    global DL_INPUT_COLS, DL_READY, ML_READY, metrics, metrics_dl
+
+    # Hapus active_dataset.txt
+    if os.path.exists(ACTIVE_DATASET_FILE):
+        os.remove(ACTIVE_DATASET_FILE)
+
+    # Reset semua globals
+    ML_READY      = False
+    DL_READY      = False
+    gbr           = None
+    xgb           = None
+    knn           = None
+    scaler        = None
+    FEATURES      = []
+    lstm          = None
+    bilstm        = None
+    scaler_X      = None
+    scaler_y      = None
+    X_scaled      = None
+    data_seq      = None
+    DL_INPUT_COLS = []
+    X             = np.array([])
+    y             = np.array([])
+    data_ml       = None
+    metrics       = {}
+    metrics_dl    = {}
+
+    # Hapus metrics cache
+    _mc = get_metrics_cache_path()
+    if os.path.exists(_mc):
+        os.remove(_mc)
+
+    session.pop("nlp_report", None)
+    session.pop("last_generate_mode", None)
+    session.modified = True
+
     return jsonify({"status": "ok"})
 
 
@@ -984,10 +1252,11 @@ def _worker_generate_full(selected_model: str, active_models: list) -> None:
     try:
         np.random.seed(42)
         df_out = df.copy()
-
-        if "GBR" in active_models: df_out["GBR"] = gbr.predict(X)
-        if "XGB" in active_models: df_out["XGB"] = xgb.predict(X)
-        if "KNN" in active_models: df_out["KNN"] = knn.predict(scaler.transform(X))
+        
+        if ML_READY and gbr is not None and xgb is not None and knn is not None and scaler is not None:
+            if "GBR" in active_models: df_out["GBR"] = gbr.predict(X)
+            if "XGB" in active_models: df_out["XGB"] = xgb.predict(X)
+            if "KNN" in active_models: df_out["KNN"] = knn.predict(scaler.transform(X))
 
         need_dl = DL_READY and X_scaled is not None and any(
             m in active_models for m in ["LSTM", "BiLSTM"]
@@ -1059,9 +1328,9 @@ def _worker_generate_full(selected_model: str, active_models: list) -> None:
                 else:                 fv.append(float(last_row_dict.get(col, 0.0)))
 
             X_fut    = np.array(fv, dtype=np.float32).reshape(1, -1)
-            pred_gbr = float(gbr.predict(X_fut)[0])                    if "GBR" in active_models else float("nan")
-            pred_xgb = float(xgb.predict(X_fut)[0])                    if "XGB" in active_models else float("nan")
-            pred_knn = float(knn.predict(scaler.transform(X_fut))[0])  if "KNN" in active_models else float("nan")
+            pred_gbr = float(gbr.predict(X_fut)[0])                   if ("GBR" in active_models and gbr   is not None)                          else float("nan")
+            pred_xgb = float(xgb.predict(X_fut)[0])                   if ("XGB" in active_models and xgb   is not None)                          else float("nan")
+            pred_knn = float(knn.predict(scaler.transform(X_fut))[0]) if ("KNN" in active_models and knn   is not None and scaler is not None)    else float("nan")
 
             anchor = pred_gbr
             if np.isnan(anchor): anchor = pred_xgb
@@ -1162,7 +1431,8 @@ def _worker_generate_best() -> None:
 
         np.random.seed(42)
         df_out          = df.copy()
-        df_out["XGB_Base"] = xgb.predict(X)
+        if xgb is not None and len(X) > 0:
+            df_out["XGB_Base"] = xgb.predict(X)
 
         _X_sc     = np.array(_scaler_X.transform(df[_dl_cols].values), dtype=np.float32)
         seqs_hist = np.array([_X_sc[i-STEP:i] for i in range(STEP, len(_X_sc))])
@@ -1216,7 +1486,7 @@ def _worker_generate_best() -> None:
                 else:                 fv.append(float(last_row_dict.get(col, 0.0)))
 
             X_fut    = np.array(fv, dtype=np.float32).reshape(1, -1)
-            pred_xgb = float(xgb.predict(X_fut)[0])
+            pred_xgb = float(xgb.predict(X_fut)[0]) if xgb is not None else float("nan")
 
             new_row = history_window.iloc[-1].copy()
             new_row["YEAR"] = int(next_time.year)

@@ -1,872 +1,1209 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Ventara - Perhitungan & Prediksi</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
     <style>
-        body { font-family: 'Inter', sans-serif; }
+      body {
+        font-family: "Inter", sans-serif;
+      }
 
-        .spinner {
-            border: 4px solid #e0f2f1;
-            border-top: 4px solid #14b8a6;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 0.8s linear infinite;
+      .spinner {
+        border: 4px solid #e0f2f1;
+        border-top: 4px solid #14b8a6;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        100% {
+          transform: rotate(360deg);
         }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
+      }
 
-        .dot-pulse span {
-            display: inline-block;
-            animation: dotBounce 1.2s infinite ease-in-out;
-            font-size: 1.4rem;
-            line-height: 1;
-            color: #14b8a6;
+      .dot-pulse span {
+        display: inline-block;
+        animation: dotBounce 1.2s infinite ease-in-out;
+        font-size: 1.4rem;
+        line-height: 1;
+        color: #14b8a6;
+      }
+      .dot-pulse span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .dot-pulse span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+      @keyframes dotBounce {
+        0%,
+        80%,
+        100% {
+          transform: translateY(0);
+          opacity: 0.4;
         }
-        .dot-pulse span:nth-child(2) { animation-delay: 0.2s; }
-        .dot-pulse span:nth-child(3) { animation-delay: 0.4s; }
-        @keyframes dotBounce {
-            0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
-            40%            { transform: translateY(-6px); opacity: 1; }
+        40% {
+          transform: translateY(-6px);
+          opacity: 1;
         }
+      }
 
-        @keyframes fadeSlideIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to   { opacity: 1; transform: translateY(0); }
+      @keyframes fadeSlideIn {
+        from {
+          opacity: 0;
+          transform: translateY(8px);
         }
-        .fade-in { animation: fadeSlideIn 0.5s ease forwards; }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .fade-in {
+        animation: fadeSlideIn 0.5s ease forwards;
+      }
     </style>
-</head>
-<body class="bg-gray-50">
-<div class="flex h-screen">
+  </head>
+  <body class="bg-gray-50">
+    <div class="flex h-screen">
+      {% include 'sidebar.html' %}
 
-    {% include 'sidebar.html' %}
-
-    <!-- ─── Main Content ─── -->
-    <main class="flex-1 overflow-y-auto">
-
+      <!-- ─── Main Content ─── -->
+      <main class="flex-1 overflow-y-auto">
         {% include 'header.html' %}
 
         <div class="p-8">
-            <div class="max-w-5xl mx-auto">
+          <div class="max-w-5xl mx-auto">
+            <div class="mb-6">
+              <h2 class="text-2xl font-bold text-gray-900 mb-1">
+                Perhitungan & Prediksi
+              </h2>
+              <p class="text-gray-600 text-sm">
+                Pilih algoritma dan periode prediksi untuk peramalan energi
+              </p>
 
-                <div class="mb-6">
-                    <h2 class="text-2xl font-bold text-gray-900 mb-1">Perhitungan & Prediksi</h2>
-                    <p class="text-gray-600 text-sm">
-                        Pilih algoritma dan periode prediksi untuk peramalan energi
-                    </p>
-
-                    <p class="text-xs text-teal-600 mt-1 font-medium">
-                        Dataset Aktif:
-                        {{ active_dataset }}
-                    </p>
-                </div>
-
-                <!-- ══════════════════════════════════════ -->
-                <!-- STATUS BOX — idle | loading | nlp     -->
-                <!-- ══════════════════════════════════════ -->
-
-                <!-- STATE 1: IDLE -->
-                <div id="stateIdle"
-                    class="cursor-pointer bg-white border-2 border-dashed border-gray-300 rounded-2xl p-10 text-center mb-6 transition-all duration-300 hover:border-teal-400 hover:bg-teal-50">
-
-                    <form id="uploadForm"
-                        action="/upload_dataset"
-                        method="POST"
-                        enctype="multipart/form-data">
-
-                        <!-- ICON -->
-                        <div id="uploadIcon"
-                            class="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-4 transition-all duration-300">
-
-                            <svg class="w-8 h-8 text-teal-600"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24">
-
-                                <path stroke-linecap="round"
-                                    stroke-linejoin="round"
-                                    stroke-width="1.5"
-                                    d="M7 16V4m0 0L3 8m4-4l4 4m6 8v4m0 0l4-4m-4 4l-4-4"/>
-                            </svg>
-                        </div>
-
-                        <!-- UPLOAD TEXT -->
-                        <div id="uploadText">
-
-                            <p class="text-lg font-semibold text-gray-700 mb-1 transition-colors duration-200 hover:text-teal-600">
-                                Upload Dataset CSV
-                            </p>
-
-                            <p class="text-sm text-gray-400 mb-5 transition-colors duration-200 hover:text-teal-500">
-                                Drag & drop file CSV di sini atau klik area ini
-                            </p>
-
-                        </div>
-
-                        <!-- FILE NAME -->
-                        <p id="fileName"
-                            class="text-sm text-teal-600 font-semibold mb-2 hidden">
-                        </p>
-
-                        <!-- SUCCESS TEXT -->
-                        <p id="uploadSuccess"
-                            class="text-sm text-gray-500 hidden">
-                            Dataset berhasil diupload
-                        </p>
-
-                        <!-- INPUT -->
-                        <input type="file"
-                            id="datasetUpload"
-                            name="dataset"
-                            accept=".csv"
-                            class="hidden">
-
-                    </form>
-                </div>
-
-                <!-- STATE 2: LOADING -->
-                <div id="stateLoading" class="hidden bg-teal-50 border-2 border-teal-200 rounded-xl p-10 text-center mb-6">
-                    <div class="flex flex-col items-center gap-4">
-                        <div class="spinner"></div>
-                        <div>
-                            <p class="text-base font-semibold text-teal-700 mb-1" id="loadingTitle">Memproses prediksi...</p>
-                            <p class="text-sm text-teal-500">Mohon tunggu, jangan tutup halaman ini</p>
-                        </div>
-                        <div class="dot-pulse mt-1">
-                            <span>•</span><span>•</span><span>•</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- STATE 3: NLP RESULT -->
-                {% if nlp_report %}
-                <div id="stateNlp" class="fade-in bg-white border-2 border-teal-300 rounded-xl p-6 mb-6">
-                    <input type="hidden" id="lastGenerateMode" value="{{ session.get('last_generate_mode', 'general') }}">
-                    <div class="flex items-start gap-4">
-                        <div class="w-10 h-10 bg-teal-100 rounded-xl flex justify-center flex-shrink-0">
-                            <svg class="w-5 h-5 mt-2 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
-                            </svg>
-                        </div>
-                        <div class="flex-1">
-                            <div class="flex items-center justify-between mb-2">
-                                <h3 class="font-semibold text-teal-800">AI Forecast Summary</h3>
-                                <span class="text-xs bg-teal-100 text-teal-600 px-4 py-1 rounded-full font-medium">
-                                    Januari 2025
-                                </span>
-                            </div>
-                            <p class="text-sm text-gray-700 text-justify leading-relaxed">{{ nlp_report }}</p>
-                            <div class="mt-4 pt-4 border-t border-teal-100 flex gap-3">
-                                <a href="#" onclick="downloadCSV()">
-                                    <button class="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white font-medium rounded-lg text-sm hover:bg-teal-700 transition-colors">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
-                                        </svg>
-                                        Download Full CSV
-                                    </button>
-                                </a>
-                                <a href="/overview">
-                                    <button class="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white font-medium rounded-lg text-sm hover:bg-teal-700 transition-colors">
-                                        View Overall
-                                    </button>
-                                </a>
-                                <button onclick="resetToIdle()"
-                                    class="px-4 py-2 bg-gray-100 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors">
-                                    Reset
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                {% endif %}
-
-                <!-- ══════════════════════════════════════ -->
-                <!-- CARD UTAMA                             -->
-                <!-- ══════════════════════════════════════ -->
-                <div class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-    
-                    <!-- Pilih Algoritma + Run -->
-                    <div class="mb-6">
-                        <div class="flex items-center gap-4 mb-4">
-                            <div class="bg-teal-100 rounded-xl pt-2 pl-2.5 w-10 h-10">
-                                <svg class="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                                </svg>
-                            </div>
-                            <h3 class="font-semibold text-gray-900">Pilih Algoritma Machine Learning</h3>
-                        </div>
-
-                        <form method="POST" onsubmit="showLoading('run')" class="flex flex-wrap gap-3 items-center">
-
-                            <!-- General — jalankan semua model -->
-                            <label class="cursor-pointer">
-                                <input type="radio" name="model" value="all"
-                                    class="hidden peer"
-                                    {% if selected_model == 'all' or not selected_model %}checked{% endif %}>
-                                <span class="block px-5 py-2.5 rounded-xl font-medium border-2 text-sm transition-all select-none
-                                    peer-checked:bg-teal-50 peer-checked:border-teal-400 peer-checked:text-teal-700
-                                    bg-gray-100 border-gray-200 text-gray-700 hover:border-teal-200">
-                                    General
-                                </span>
-                            </label>
-
-                            <label class="cursor-pointer">
-                            <input type="radio" name="model" value="best"
-                                class="hidden peer"
-                                {% if selected_model == 'best' %}checked{% endif %}>
-
-                            <span class="block px-5 py-2.5 rounded-xl font-medium border-2 text-sm transition-all select-none
-                                bg-gray-100 border-gray-200 text-gray-700
-                                hover:border-amber-300 hover:text-amber-600 hover:bg-amber-50
-                                peer-checked:bg-amber-50 peer-checked:border-amber-400 peer-checked:text-amber-700">
-
-                                <span class="flex items-center gap-1.5">
-                                    <svg class="w-3.5 h-3.5 text-amber-500" fill="currentColor" viewBox="0 0 20 20">
-                                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                                    </svg>
-
-                                    Best 2 Model
-                                    <span class="text-xs text-amber-500 font-normal">
-                                        ({{ best_model_names[0] }} & {{ best_model_names[1] }})
-                                    </span>
-                                </span>
-                            </span>
-                        </label>
-                        </form>
-                    </div>
-
-                    <!-- ══════════════════════════════════════════════ -->
-                    <!-- METRICS CARDS                                  -->
-                    <!-- General → tampil semua                         -->
-                    <!-- Best    → highlight 2 terbaik, gray sisanya   -->
-                    <!-- ══════════════════════════════════════════════ -->
-                    <div class="mb-6">
-                        <h4 class="font-medium text-gray-700 mb-3 text-sm">
-                            Model Ensemble yang Digunakan
-                        </h4>
-
-                        <!-- 🔹 BARIS ATAS (SELain LSTM & BiLSTM) -->
-                        <div class="grid grid-cols-3 gap-4">
-                            {% for model, m in metrics.items() if model not in ['LSTM','BiLSTM'] %}
-
-                            {% set is_best = model in best_model_names %}
-                            {% set rank = best_model_names.index(model) + 1 if is_best else 0 %}
-
-                            <div class="border rounded-xl p-4 transition-all
-                                {% if selected_model == 'best' and not is_best %}opacity-30 grayscale{% endif %}
-                                {% if is_best %}bg-amber-50 border-amber-300{% else %}bg-gray-50 border-gray-200{% endif %}">
-
-                                <div class="flex items-center justify-between mb-3">
-                                    <p class="font-bold text-base
-                                        {% if is_best %}text-amber-700{% else %}text-teal-700{% endif %}">
-                                        {{ model }}
-                                    </p>
-
-                                    {% if is_best %}
-                                    <span class="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium
-                                        {% if rank == 1 %}bg-amber-100 text-amber-600{% else %}bg-orange-100 text-orange-500{% endif %}">
-                                        
-                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                                        </svg>
-
-                                        {% if rank == 1 %}#1 Best{% else %}#2 Best{% endif %}
-                                    </span>
-                                    {% endif %}
-                                </div>
-
-                                <div class="space-y-1.5 text-xs text-gray-600">
-                                    <div class="flex justify-between">
-                                        <span>MAE</span>
-                                        <span class="font-semibold text-gray-800">{{ m.MAE }}</span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span>RMSE</span>
-                                        <span class="font-semibold text-gray-800">{{ m.RMSE }}</span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span>MAPE</span>
-                                        <span class="font-semibold
-                                            {% if rank == 1 %}text-amber-600
-                                            {% elif rank == 2 %}text-orange-500
-                                            {% else %}text-gray-800{% endif %}">
-                                            {{ m.MAPE }}%
-                                        </span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span>R²</span>
-                                        <span class="font-semibold text-gray-800">{{ m.R2 }}</span>
-                                    </div>
-                                </div>
-
-                            </div>
-                            {% endfor %}
-                        </div>
-
-                        <!-- 🔹 BARIS BAWAH (LSTM & BiLSTM - CENTER) -->
-                        <div class="flex justify-center gap-4 mt-4">
-                            {% for model, m in metrics.items() if model in ['LSTM','BiLSTM'] %}
-
-                            {% set is_best = model in best_model_names %}
-                            {% set rank = best_model_names.index(model) + 1 if is_best else 0 %}
-
-                            <div class="w-full md:w-1/3 border rounded-xl p-4 transition-all
-                                {% if selected_model == 'best' and not is_best %}opacity-30 grayscale{% endif %}
-                                {% if is_best %}bg-amber-50 border-amber-300{% else %}bg-gray-50 border-gray-200{% endif %}">
-
-                                <div class="flex items-center justify-between mb-3">
-                                    <p class="font-bold text-base
-                                        {% if is_best %}text-amber-700{% else %}text-teal-700{% endif %}">
-                                        {{ model }}
-                                    </p>
-
-                                    {% if is_best %}
-                                    <span class="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium
-                                        {% if rank == 1 %}bg-amber-100 text-amber-600{% else %}bg-orange-100 text-orange-500{% endif %}">
-                                        
-                                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
-                                        </svg>
-
-                                        {% if rank == 1 %}#1 Best{% else %}#2 Best{% endif %}
-                                    </span>
-                                    {% endif %}
-                                </div>
-
-                                <div class="space-y-1.5 text-xs text-gray-600">
-                                    <div class="flex justify-between">
-                                        <span>MAE</span>
-                                        <span class="font-semibold text-gray-800">{{ m.MAE }}</span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span>RMSE</span>
-                                        <span class="font-semibold text-gray-800">{{ m.RMSE }}</span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span>MAPE</span>
-                                        <span class="font-semibold
-                                            {% if rank == 1 %}text-amber-600
-                                            {% elif rank == 2 %}text-orange-500
-                                            {% else %}text-gray-800{% endif %}">
-                                            {{ m.MAPE }}%
-                                        </span>
-                                    </div>
-                                    <div class="flex justify-between">
-                                        <span>R²</span>
-                                        <span class="font-semibold text-gray-800">{{ m.R2 }}</span>
-                                    </div>
-                                </div>
-
-                            </div>
-                            {% endfor %}
-                        </div>
-
-                    </div>
-
-                    <!-- Hasil Prediksi Tabel -->
-                    {% if result %}
-                    <div class="mb-6">
-                        <h4 class="font-medium text-gray-700 mb-3 text-sm">Hasil Prediksi 1 Jam ke Depan</h4>
-                        <div class="overflow-x-auto rounded-xl border border-gray-200">
-                            <table class="w-full text-sm">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Model</th>
-                                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Prediksi (m/s)</th>
-                                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Aktual (m/s)</th>
-                                        <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Error</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-100">
-                                    {% for row in result %}
-                                    <tr class="hover:bg-gray-50 transition-colors">
-                                        <td class="px-5 py-3 font-semibold text-teal-700">{{ row.model }}</td>
-                                        <td class="px-5 py-3 text-gray-800">{{ row.prediction }}</td>
-                                        <td class="px-5 py-3 text-gray-800">{{ row.actual }}</td>
-                                        <td class="px-5 py-3">
-                                            <span class="px-2 py-1 rounded-md text-xs font-medium
-                                                {% if row.error < 0.1 %}bg-green-100 text-green-700
-                                                {% elif row.error < 0.5 %}bg-yellow-100 text-yellow-700
-                                                {% else %}bg-red-100 text-red-700{% endif %}">
-                                                {{ row.error }}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    {% endif %}
-
-                    <!-- Action Buttons -->
-                    <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
-
-                        <a href="#" onclick="generateCSV()">
-                            <button class="flex items-center gap-2 px-5 py-2.5 bg-teal-500 text-white font-medium rounded-xl text-sm hover:bg-teal-600 transition-colors">
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
-                                </svg>
-                                Generate Full CSV
-                            </button>
-                        </a>
-
-                    </div>
-
-                </div>
+              <p class="text-xs text-teal-600 mt-1 font-medium">
+                Dataset Aktif: {{ dataset_name }}
+              </p>
             </div>
-        </div>
-    </main>
-</div>
 
-            <!-- TOAST PROGRESS -->
-                <div id="progressToast"
-                    class="hidden fixed bottom-5 right-5 z-50 w-80 bg-white border border-teal-200 shadow-2xl rounded-2xl p-4 transition-all duration-300">
+            <!-- ══════════════════════════════════════ -->
+            <!-- STATUS BOX — idle | loading | nlp     -->
+            <!-- ══════════════════════════════════════ -->
 
-                    <!-- HEADER -->
-                    <div class="flex items-center justify-between mb-2">
+            <!-- STATE 1: IDLE -->
+            <div
+              id="stateIdle"
+              class="bg-white border-2 border-dashed border-gray-300 rounded-2xl p-10 text-center mb-6 transition-all duration-300 hover:border-teal-400 hover:bg-teal-50"
+            >
+              <form id="uploadForm" action="/upload_dataset" method="POST" enctype="multipart/form-data">
+                <input type="file" id="datasetUpload" name="dataset" accept=".csv" class="hidden" />
+              </form>
 
-                        <div>
-                            <h3 class="text-sm font-semibold text-teal-700">
-                                Generating Forecast
-                            </h3>
+              {% if dataset_name %}
+              <!-- ── SUDAH ADA DATASET ── -->
+              <div id="datasetActiveView">
+                <div class="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <svg class="w-8 h-8 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                  </svg>
+                </div>
+                <p class="text-base font-semibold text-gray-700 mb-1">Dataset Aktif</p>
+                <p class="text-sm font-mono text-teal-600 bg-teal-50 px-4 py-1.5 rounded-full inline-block mb-5">
+                  📄 {{ dataset_name }}
+                </p>
+                <div class="flex items-center justify-center gap-3">
+                  <button
+                    onclick="document.getElementById('datasetUpload').click()"
+                    class="flex items-center gap-2 px-4 py-2 bg-teal-500 text-white text-sm font-medium rounded-xl hover:bg-teal-600 transition-colors"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/>
+                    </svg>
+                    Ganti Dataset
+                  </button>
+                  <button
+                    onclick="resetDataset()"
+                    class="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 text-sm font-medium rounded-xl border border-gray-200 hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors"
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                    </svg>
+                    Reset Dataset
+                  </button>
+                </div>
+                <p id="fileName" class="text-sm text-teal-600 font-semibold mt-3 hidden"></p>
+              </div>
 
-                            <p class="text-xs text-gray-500">
-                                AI Forecast Progress
-                            </p>
-                        </div>
+              {% else %}
+              <!-- ── BELUM ADA DATASET ── -->
+              <div id="uploadEmptyView" class="cursor-pointer" onclick="document.getElementById('datasetUpload').click()">
+                <div id="uploadIcon" class="w-16 h-16 bg-teal-50 rounded-full flex items-center justify-center mx-auto mb-4 transition-all duration-300">
+                  <svg class="w-8 h-8 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                      d="M7 16V4m0 0L3 8m4-4l4 4m6 8v4m0 0l4-4m-4 4l-4-4"/>
+                  </svg>
+                </div>
+                <div id="uploadText">
+                  <p class="text-lg font-semibold text-gray-700 mb-1 transition-colors duration-200 hover:text-teal-600">
+                    Upload Dataset CSV
+                  </p>
+                  <p class="text-sm text-gray-400 mb-5 transition-colors duration-200 hover:text-teal-500">
+                    Drag & drop file CSV di sini atau klik area ini
+                  </p>
+                </div>
+                <p id="fileName" class="text-sm text-teal-600 font-semibold mb-2 hidden"></p>
+                <p id="uploadSuccess" class="text-sm text-gray-500 hidden">Dataset berhasil diupload</p>
+              </div>
+              {% endif %}
 
-                        <span id="toastPercent"
-                            class="text-xs font-semibold text-teal-600">
-                            0%
-                        </span>
-                    </div>
+            </div>
 
-                    <!-- PROGRESS BAR -->
-                    <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
+            <!-- STATE 2: LOADING -->
+            <div
+              id="stateLoading"
+              class="hidden bg-teal-50 border-2 border-teal-200 rounded-xl p-10 text-center mb-6"
+            >
+              <div class="flex flex-col items-center gap-4">
+                <div class="spinner"></div>
+                <div>
+                  <p
+                    class="text-base font-semibold text-teal-700 mb-1"
+                    id="loadingTitle"
+                  >
+                    Memproses prediksi...
+                  </p>
+                  <p class="text-sm text-teal-500">
+                    Mohon tunggu, jangan tutup halaman ini
+                  </p>
+                </div>
+                <div class="dot-pulse mt-1">
+                  <span>•</span><span>•</span><span>•</span>
+                </div>
+              </div>
+            </div>
 
-                        <div id="toastBar"
-                            class="h-full bg-teal-500 rounded-full transition-all duration-500"
-                            style="width:0%">
-                        </div>
-                    </div>
+            <!-- STATE 3: NLP RESULT -->
+            {% if nlp_report %}
+            <div
+              id="stateNlp"
+              class="fade-in bg-white border-2 border-teal-300 rounded-xl p-6 mb-6"
+            >
+              <input
+                type="hidden"
+                id="lastGenerateMode"
+                value="{{ last_generate_mode }}"
+              />
+              <div class="flex items-start gap-4">
+                <div
+                  class="w-10 h-10 bg-teal-100 rounded-xl flex justify-center flex-shrink-0"
+                >
+                  <svg
+                    class="w-5 h-5 mt-2 text-teal-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                    />
+                  </svg>
+                </div>
+                <div class="flex-1">
+                  <div class="flex items-center justify-between mb-2">
+                    <h3 class="font-semibold text-teal-800">
+                      AI Forecast Summary
+                    </h3>
+                    <span
+                      class="text-xs bg-teal-100 text-teal-600 px-4 py-1 rounded-full font-medium"
+                    >
+                      Januari 2025
+                    </span>
+                  </div>
+                  <p class="text-sm text-gray-700 text-justify leading-relaxed">
+                    {{ nlp_report }}
+                  </p>
+                  <div class="mt-4 pt-4 border-t border-teal-100 flex gap-3">
+                    <a href="#" onclick="downloadCSV()">
+                      <button
+                        class="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white font-medium rounded-lg text-sm hover:bg-teal-700 transition-colors"
+                      >
+                        <svg
+                          class="w-4 h-4"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            stroke-linecap="round"
+                            stroke-linejoin="round"
+                            stroke-width="2"
+                            d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
+                          />
+                        </svg>
+                        Download Full CSV
+                      </button>
+                    </a>
+                    <a href="/overview">
+                      <button
+                        class="flex items-center gap-2 px-5 py-2.5 bg-teal-600 text-white font-medium rounded-lg text-sm hover:bg-teal-700 transition-colors"
+                      >
+                        View Overall
+                      </button>
+                    </a>
+                    <button
+                      onclick="resetToIdle()"
+                      class="px-4 py-2 bg-gray-100 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            {% endif %}
 
-                    <!-- STATUS -->
-                    <p id="toastStatus"
-                        class="text-sm text-gray-700 font-medium">
-                        Preparing...
-                    </p>
-
-                    <!-- ETA -->
-                    <p id="toastETA"
-                        class="text-xs text-gray-500 mt-1">
-                        ETA -- • Elapsed --
-                    </p>
+            <!-- ══════════════════════════════════════ -->
+            <!-- CARD UTAMA                             -->
+            <!-- ══════════════════════════════════════ -->
+            <div
+              class="bg-white rounded-xl border border-gray-200 p-6 shadow-sm"
+            >
+              <!-- Pilih Algoritma + Run -->
+              <div class="mb-6">
+                <div class="flex items-center gap-4 mb-4">
+                  <div class="bg-teal-100 rounded-xl pt-2 pl-2.5 w-10 h-10">
+                    <svg
+                      class="w-5 h-5 text-teal-600"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                      />
+                    </svg>
+                  </div>
+                  <h3 class="font-semibold text-gray-900">
+                    Pilih Algoritma Machine Learning
+                  </h3>
                 </div>
 
-<script>
-let _pollActive = false;
+                <form
+                  method="POST"
+                  onsubmit="showLoading('run')"
+                  class="flex flex-wrap gap-3 items-center"
+                >
+                  <!-- General — jalankan semua model -->
+                  <label class="cursor-pointer">
+                    <input
+                      type="radio"
+                      name="model"
+                      value="all"
+                      class="hidden peer"
+                      {% if selected_model == 'all' or not selected_model %}checked{% endif %}
+                    />
+                    <span
+                      class="block px-5 py-2.5 rounded-xl font-medium border-2 text-sm transition-all select-none peer-checked:bg-teal-50 peer-checked:border-teal-400 peer-checked:text-teal-700 bg-gray-100 border-gray-200 text-gray-700 hover:border-teal-200"
+                    >
+                      General
+                    </span>
+                  </label>
 
-// =========================
-// ELEMENT
-// =========================
-const stateIdle    = document.getElementById('stateIdle');
-const stateLoading = document.getElementById('stateLoading');
-const stateNlp     = document.getElementById('stateNlp');
+                  <label class="cursor-pointer">
+                    <input
+                      type="radio"
+                      name="model"
+                      value="best"
+                      class="hidden peer"
+                      {% if selected_model == 'best' %}checked{% endif %}
+                    />
 
-const uploadForm   = document.getElementById('uploadForm');
-const datasetInput = document.getElementById('datasetUpload');
-const fileName     = document.getElementById('fileName');
+                    <span
+                      class="block px-5 py-2.5 rounded-xl font-medium border-2 text-sm transition-all select-none bg-gray-100 border-gray-200 text-gray-700 hover:border-amber-300 hover:text-amber-600 hover:bg-amber-50 peer-checked:bg-amber-50 peer-checked:border-amber-400 peer-checked:text-amber-700"
+                    >
+                      <span class="flex items-center gap-1.5">
+                        <svg
+                          class="w-3.5 h-3.5 text-amber-500"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+                          />
+                        </svg>
 
+                        Best 2 Model
+                        <span class="text-xs text-amber-500 font-normal">
+                          {% if best_model_names|length >= 2 %}
+                          ({{ best_model_names[0] }} & {{ best_model_names[1] }})
+                          {% endif %}
+                        </span>
+                      </span>
+                    </span>
+                  </label>
+                </form>
+              </div>
 
-// =========================
-// INITIAL STATE
-// =========================
-window.addEventListener('DOMContentLoaded', () => {
+              <!-- ══════════════════════════════════════════════ -->
+              <!-- METRICS CARDS                                  -->
+              <!-- General → tampil semua                         -->
+              <!-- Best    → highlight 2 terbaik, gray sisanya   -->
+              <!-- ══════════════════════════════════════════════ -->
+              <div class="mb-6">
+                <h4 class="font-medium text-gray-700 mb-3 text-sm">
+                  Model Ensemble yang Digunakan
+                </h4>
 
-    // kalau ada NLP result
-    if (stateNlp) {
+                <!-- 🔹 BARIS ATAS (SELain LSTM & BiLSTM) -->
+                <div class="grid grid-cols-3 gap-4">
+                  {% for model, m in metrics.items() if model not in
+                  ['LSTM','BiLSTM'] %} {% set is_best = model in
+                  best_model_names %} {% set rank =
+                  best_model_names.index(model) + 1 if is_best else 0 %}
 
-        stateIdle.classList.add('hidden');
-        stateLoading.classList.add('hidden');
-        stateNlp.classList.remove('hidden');
-    }
+                  <div
+                    class="border rounded-xl p-4 transition-all {% if selected_model == 'best' and not is_best %}opacity-30 grayscale{% endif %} {% if is_best %}bg-amber-50 border-amber-300{% else %}bg-gray-50 border-gray-200{% endif %}"
+                  >
+                    <div class="flex items-center justify-between mb-3">
+                      <p
+                        class="font-bold text-base {% if is_best %}text-amber-700{% else %}text-teal-700{% endif %}"
+                      >
+                        {{ model }}
+                      </p>
 
-    // default idle
-    else {
+                      {% if is_best %}
+                      <span
+                        class="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium {% if rank == 1 %}bg-amber-100 text-amber-600{% else %}bg-orange-100 text-orange-500{% endif %}"
+                      >
+                        <svg
+                          class="w-3 h-3"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+                          />
+                        </svg>
 
-        stateIdle.classList.remove('hidden');
-        stateLoading.classList.add('hidden');
-    }
-});
+                        {% if rank == 1 %}#1 Best{% else %}#2 Best{% endif %}
+                      </span>
+                      {% endif %}
+                    </div>
 
+                    <div class="space-y-1.5 text-xs text-gray-600">
+                      <div class="flex justify-between">
+                        <span>MAE</span>
+                        <span class="font-semibold text-gray-800"
+                          >{{ m.MAE }}</span
+                        >
+                      </div>
+                      <div class="flex justify-between">
+                        <span>RMSE</span>
+                        <span class="font-semibold text-gray-800"
+                          >{{ m.RMSE }}</span
+                        >
+                      </div>
+                      <div class="flex justify-between">
+                        <span>MAPE</span>
+                        <span
+                          class="font-semibold {% if rank == 1 %}text-amber-600 {% elif rank == 2 %}text-orange-500 {% else %}text-gray-800{% endif %}"
+                        >
+                          {{ m.MAPE }}%
+                        </span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span>R²</span>
+                        <span class="font-semibold text-gray-800"
+                          >{{ m.R2 }}</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
 
-// =========================
-// SHOW LOADING
-// =========================
-function showLoading(type) {
+                <!-- 🔹 BARIS BAWAH (LSTM & BiLSTM - CENTER) -->
+                <div class="flex justify-center gap-4 mt-4">
+                  {% for model, m in metrics.items() if model in
+                  ['LSTM','BiLSTM'] %} {% set is_best = model in
+                  best_model_names %} {% set rank =
+                  best_model_names.index(model) + 1 if is_best else 0 %}
 
-    // hide semua
-    stateIdle.classList.add('hidden');
+                  <div
+                    class="w-full md:w-1/3 border rounded-xl p-4 transition-all {% if selected_model == 'best' and not is_best %}opacity-30 grayscale{% endif %} {% if is_best %}bg-amber-50 border-amber-300{% else %}bg-gray-50 border-gray-200{% endif %}"
+                  >
+                    <div class="flex items-center justify-between mb-3">
+                      <p
+                        class="font-bold text-base {% if is_best %}text-amber-700{% else %}text-teal-700{% endif %}"
+                      >
+                        {{ model }}
+                      </p>
 
-    if (stateNlp) {
-        stateNlp.classList.add('hidden');
-    }
+                      {% if is_best %}
+                      <span
+                        class="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium {% if rank == 1 %}bg-amber-100 text-amber-600{% else %}bg-orange-100 text-orange-500{% endif %}"
+                      >
+                        <svg
+                          class="w-3 h-3"
+                          fill="currentColor"
+                          viewBox="0 0 20 20"
+                        >
+                          <path
+                            d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"
+                          />
+                        </svg>
 
-    // show loading
-    stateLoading.classList.remove('hidden');
+                        {% if rank == 1 %}#1 Best{% else %}#2 Best{% endif %}
+                      </span>
+                      {% endif %}
+                    </div>
 
-    // title
-    document.getElementById('loadingTitle').textContent =
-        type === 'generate'
-            ? 'Generating Full CSV 7 Hari ke Depan'
-            : 'Memproses prediksi model...';
-}
+                    <div class="space-y-1.5 text-xs text-gray-600">
+                      <div class="flex justify-between">
+                        <span>MAE</span>
+                        <span class="font-semibold text-gray-800"
+                          >{{ m.MAE }}</span
+                        >
+                      </div>
+                      <div class="flex justify-between">
+                        <span>RMSE</span>
+                        <span class="font-semibold text-gray-800"
+                          >{{ m.RMSE }}</span
+                        >
+                      </div>
+                      <div class="flex justify-between">
+                        <span>MAPE</span>
+                        <span
+                          class="font-semibold {% if rank == 1 %}text-amber-600 {% elif rank == 2 %}text-orange-500 {% else %}text-gray-800{% endif %}"
+                        >
+                          {{ m.MAPE }}%
+                        </span>
+                      </div>
+                      <div class="flex justify-between">
+                        <span>R²</span>
+                        <span class="font-semibold text-gray-800"
+                          >{{ m.R2 }}</span
+                        >
+                      </div>
+                    </div>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
 
+              <!-- Hasil Prediksi Tabel -->
+              {% if result %}
+              <div class="mb-6">
+                <h4 class="font-medium text-gray-700 mb-3 text-sm">
+                  Hasil Prediksi 1 Jam ke Depan
+                </h4>
+                <div class="overflow-x-auto rounded-xl border border-gray-200">
+                  <table class="w-full text-sm">
+                    <thead class="bg-gray-50">
+                      <tr>
+                        <th
+                          class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                        >
+                          Model
+                        </th>
+                        <th
+                          class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                        >
+                          Prediksi (m/s)
+                        </th>
+                        <th
+                          class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                        >
+                          Aktual (m/s)
+                        </th>
+                        <th
+                          class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider"
+                        >
+                          Error
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                      {% for row in result %}
+                      <tr class="hover:bg-gray-50 transition-colors">
+                        <td class="px-5 py-3 font-semibold text-teal-700">
+                          {{ row.model }}
+                        </td>
+                        <td class="px-5 py-3 text-gray-800">
+                          {{ row.prediction }}
+                        </td>
+                        <td class="px-5 py-3 text-gray-800">
+                          {{ row.actual }}
+                        </td>
+                        <td class="px-5 py-3">
+                          <span
+                            class="px-2 py-1 rounded-md text-xs font-medium {% if row.error < 0.1 %}bg-green-100 text-green-700 {% elif row.error < 0.5 %}bg-yellow-100 text-yellow-700 {% else %}bg-red-100 text-red-700{% endif %}"
+                          >
+                            {{ row.error }}
+                          </span>
+                        </td>
+                      </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {% endif %}
 
-// =========================
-// SHOW IDLE
-// =========================
-function showIdle() {
+              <!-- Action Buttons -->
+              <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                <a href="#" onclick="generateCSV()">
+                  <button
+                    class="flex items-center gap-2 px-5 py-2.5 bg-teal-500 text-white font-medium rounded-xl text-sm hover:bg-teal-600 transition-colors"
+                  >
+                    <svg
+                      class="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        stroke-width="2"
+                        d="M13 10V3L4 14h7v7l9-11h-7z"
+                      />
+                    </svg>
+                    Generate Full CSV
+                  </button>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
 
-    stateLoading.classList.add('hidden');
+    <!-- ═══════════════════════════════════════ -->
+    <!-- TOAST TRAINING NOTIFICATION             -->
+    <!-- ═══════════════════════════════════════ -->
+    <div
+      id="trainToast"
+      class="hidden fixed bottom-6 right-6 z-50 w-80"
+      style="
+        transition: all 0.4s ease;
+        transform: translateY(100px);
+        opacity: 0;
+      "
+    >
+      <div
+        class="bg-gray-900 text-white rounded-2xl shadow-2xl overflow-hidden"
+      >
+        <!-- Header -->
+        <div class="flex items-center gap-3 px-4 py-3 bg-indigo-600">
+          <div class="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+          <span class="text-sm font-semibold">Training Model</span>
+          <span
+            id="trainToastStep"
+            class="ml-auto text-xs bg-indigo-500 px-2 py-0.5 rounded-full truncate max-w-[120px]"
+          >
+            Memulai...
+          </span>
+        </div>
 
-    if (stateNlp) {
-        stateNlp.classList.add('hidden');
-    }
+        <!-- Progress bar -->
+        <div class="h-1 bg-gray-700">
+          <div
+            id="trainProgressBar"
+            class="h-1 bg-indigo-400 transition-all duration-500"
+            style="width: 0%"
+          ></div>
+        </div>
 
-    stateIdle.classList.remove('hidden');
-}
+        <!-- Log scroll area -->
+        <div class="px-4 py-3">
+          <p class="text-xs text-gray-400 mb-2">Log Training</p>
+          <div
+            id="trainLog"
+            class="bg-gray-800 rounded-lg p-2 h-28 overflow-y-auto text-xs font-mono space-y-1"
+          >
+            <p class="text-gray-500">Menunggu log...</p>
+          </div>
+        </div>
 
+        <!-- Status bawah -->
+        <div
+          id="trainToastFooter"
+          class="px-4 py-2 bg-gray-800 text-xs text-gray-400 text-center"
+        >
+          Jangan tutup atau refresh halaman ini
+        </div>
+      </div>
+    </div>
 
-// =========================
-// CLICK AREA
-// =========================
-stateIdle.addEventListener('click', () => {
-    datasetInput.click();
-});
+    <!-- ═══════════════════════════════════════ -->
+    <!-- TOAST PROGRESS NOTIFICATION             -->
+    <!-- ═══════════════════════════════════════ -->
+    <div
+      id="progressToast"
+      class="hidden fixed bottom-5 right-5 z-50 w-80 bg-white border border-teal-200 shadow-2xl rounded-2xl p-4 transition-all duration-300"
+    >
+      <!-- HEADER -->
+      <div class="flex items-center justify-between mb-2">
+        <div>
+          <h3 class="text-sm font-semibold text-teal-700">
+            Generating Forecast
+          </h3>
 
+          <p class="text-xs text-gray-500">AI Forecast Progress</p>
+        </div>
 
-// =========================
-// INPUT CHANGE
-// =========================
-datasetInput.addEventListener('change', () => {
-    handleFiles(datasetInput.files);
-});
+        <span id="toastPercent" class="text-xs font-semibold text-teal-600">
+          0%
+        </span>
+      </div>
 
+      <!-- PROGRESS BAR -->
+      <div class="w-full h-2 bg-gray-200 rounded-full overflow-hidden mb-3">
+        <div
+          id="toastBar"
+          class="h-full bg-teal-500 rounded-full transition-all duration-500"
+          style="width: 0%"
+        ></div>
+      </div>
 
-// =========================
-// DRAG OVER
-// =========================
-stateIdle.addEventListener('dragover', (e) => {
+      <!-- STATUS -->
+      <p id="toastStatus" class="text-sm text-gray-700 font-medium">
+        Preparing...
+      </p>
 
-    e.preventDefault();
+      <!-- ETA -->
+      <p id="toastETA" class="text-xs text-gray-500 mt-1">
+        ETA -- • Elapsed --
+      </p>
+    </div>
 
-    stateIdle.classList.add(
-        'border-teal-500',
-        'bg-teal-50'
-    );
-});
+    <script>
+      let _pollActive = false;
+      let trainInterval = null;
 
+      // =========================
+      // TRAIN TOAST
+      // =========================
+      function startTrainToast() {
+        const toast = document.getElementById("trainToast");
 
-// =========================
-// DRAG LEAVE
-// =========================
-stateIdle.addEventListener('dragleave', () => {
+        toast.classList.remove("hidden");
 
-    stateIdle.classList.remove(
-        'border-teal-500',
-        'bg-teal-50'
-    );
-});
+        setTimeout(() => {
+          toast.style.transform = "translateY(0)";
+          toast.style.opacity = "1";
+        }, 50);
 
+        const steps = [
+          "Load dataset",
+          "Training GBR",
+          "Training XGBoost",
+          "Training KNN",
+          "Training LSTM",
+          "Training BiLSTM",
+          "Update globals",
+          "Selesai",
+        ];
 
-// =========================
-// DROP FILE
-// =========================
-stateIdle.addEventListener('drop', (e) => {
-
-    e.preventDefault();
-
-    stateIdle.classList.remove(
-        'border-teal-500',
-        'bg-teal-50'
-    );
-
-    datasetInput.files = e.dataTransfer.files;
-
-    handleFiles(e.dataTransfer.files);
-});
-
-
-// =========================
-// HANDLE FILE
-// =========================
-function handleFiles(files) {
-
-    // VALIDASI KOSONG
-    if (!files || files.length === 0) {
-
-        fileName.textContent =
-            '❌ Tidak ada file dipilih';
-
-        fileName.classList.remove('hidden');
-
-        return;
-    }
-
-    const file = files[0];
-
-    // TAMPILKAN NAMA FILE
-    fileName.textContent = `📄 ${file.name}`;
-    fileName.classList.remove('hidden');
-
-    // VALIDASI CSV
-    if (!file.name.toLowerCase().endsWith('.csv')) {
-
-        fileName.textContent =
-            '❌ File harus format CSV';
-
-        return;
-    }
-
-    // SHOW LOADING
-    showLoading('upload');
-
-    // =========================
-    // FORM DATA
-    // =========================
-    const formData = new FormData();
-
-    formData.append('dataset', file);
-
-    // =========================
-    // FETCH UPLOAD
-    // =========================
-    fetch('/upload_dataset', {
-        method: 'POST',
-        body: formData
-    })
-
-    .then(async (res) => {
-
-        const data = await res.json();
-
-        if (!res.ok) {
-            throw data;
+        // Biar seng double interval
+        if (trainInterval) {
+          clearInterval(trainInterval);
         }
 
-        return data;
-    })
+        trainInterval = setInterval(async () => {
+          try {
+            const res = await fetch("/train_progress");
+            const data = await res.json();
 
-    .then((data) => {
+            // STEP
+            const stepEl = document.getElementById("trainToastStep");
 
-        // =========================
-        // VALID
-        // =========================
-        if (data.status === 'valid') {
-
-        document.getElementById('stateLoading')
-            .classList.add('hidden');
-
-        stateIdle.classList.remove('hidden');
-
-        // SEMBUNYIKAN TEXT DEFAULT
-        stateIdle.querySelectorAll('p').forEach(el => {
-            if (el.id !== 'fileName') {
-                el.classList.add('hidden');
+            if (stepEl) {
+              stepEl.textContent = data.step || "Berjalan...";
             }
-        });
 
-        // TAMPILKAN NAMA FILE SAJA
-        fileName.innerHTML =
-            `✅ ${data.filename} berhasil diupload`;
+            // PROGRESS BAR
+            const stepIdx = steps.findIndex((s) =>
+              (data.step || "").toLowerCase().includes(s.toLowerCase()),
+            );
 
-        fileName.classList.remove('hidden');
+            const pct =
+              stepIdx >= 0
+                ? Math.round(((stepIdx + 1) / steps.length) * 100)
+                : data.done
+                  ? 100
+                  : 10;
 
-        // OPTIONAL
-        console.log(data.info);
-    }
+            const bar = document.getElementById("trainProgressBar");
+
+            if (bar) {
+              bar.style.width = pct + "%";
+            }
+
+            // LOG
+            const logEl = document.getElementById("trainLog");
+
+            if (logEl && data.log && data.log.length > 0) {
+              logEl.innerHTML = data.log
+                .map((line) => {
+                  const color = line.startsWith("✅")
+                    ? "text-green-400"
+                    : line.startsWith("❌")
+                      ? "text-red-400"
+                      : line.startsWith("⚠️")
+                        ? "text-yellow-400"
+                        : line.startsWith("🔧")
+                          ? "text-blue-300"
+                          : "text-gray-300";
+
+                  return `<p class="${color}">${line}</p>`;
+                })
+                .join("");
+
+              logEl.scrollTop = logEl.scrollHeight;
+            }
+
+            // DONE
+            if (data.done && !data.running) {
+              clearInterval(trainInterval);
+
+              const footer = document.getElementById("trainToastFooter");
+              const bar2 = document.getElementById("trainProgressBar");
+
+              if (data.error) {
+                if (bar2) {
+                  bar2.style.backgroundColor = "#ef4444";
+                }
+
+                if (footer) {
+                  footer.textContent = "❌ Training gagal: " + data.error;
+                }
+
+                if (stepEl) {
+                  stepEl.textContent = "Error";
+                }
+              } else {
+                if (bar2) {
+                  bar2.style.width = "100%";
+                }
+
+                if (footer) {
+                  footer.textContent =
+                    "✅ Training selesai! Halaman akan direfresh...";
+
+                  footer.classList.remove("text-gray-400");
+                  footer.classList.add("text-green-400");
+                }
+
+                setTimeout(() => {
+                  window.location.reload();
+                }, 2000);
+              }
+            }
+          } catch (e) {
+            console.log("Train polling skip:", e);
+          }
+        }, 2000);
+      }
+
+      // =========================
+      // ELEMENT
+      // =========================
+      const stateIdle = document.getElementById("stateIdle");
+      const stateLoading = document.getElementById("stateLoading");
+      const stateNlp = document.getElementById("stateNlp");
+
+      const uploadForm = document.getElementById("uploadForm");
+      const datasetInput = document.getElementById("datasetUpload");
+      const fileName = document.getElementById("fileName");
+
+      // =========================
+      // INITIAL STATE
+      // =========================
+      window.addEventListener("DOMContentLoaded", () => {
+        // kalau ada NLP result
+        if (stateNlp) {
+          stateIdle.classList.add("hidden");
+          stateLoading.classList.add("hidden");
+          stateNlp.classList.remove("hidden");
+        }
+
+        // default idle
+        else {
+          stateIdle.classList.remove("hidden");
+          stateLoading.classList.add("hidden");
+        }
+      });
+
+      // =========================
+      // SHOW LOADING
+      // =========================
+      function showLoading(type) {
+        // hide semua
+        stateIdle.classList.add("hidden");
+
+        if (stateNlp) {
+          stateNlp.classList.add("hidden");
+        }
+
+        // show loading
+        stateLoading.classList.remove("hidden");
+
+        // title
+        document.getElementById("loadingTitle").textContent =
+          type === "generate"
+            ? "Generating Full CSV 7 Hari ke Depan"
+            : "Memproses prediksi model...";
+      }
+
+      // =========================
+      // SHOW IDLE
+      // =========================
+      function showIdle() {
+        stateLoading.classList.add("hidden");
+
+        if (stateNlp) {
+          stateNlp.classList.add("hidden");
+        }
+
+        stateIdle.classList.remove("hidden");
+      }
+
+      // =========================
+      // CLICK AREA
+      // =========================
+      stateIdle.addEventListener("click", () => {
+        datasetInput.click();
+      });
+
+      // =========================
+      // INPUT CHANGE
+      // =========================
+      datasetInput.addEventListener("change", () => {
+        handleFiles(datasetInput.files);
+      });
+
+      // =========================
+      // DRAG OVER
+      // =========================
+      stateIdle.addEventListener("dragover", (e) => {
+        e.preventDefault();
+
+        stateIdle.classList.add("border-teal-500", "bg-teal-50");
+      });
+
+      // =========================
+      // DRAG LEAVE
+      // =========================
+      stateIdle.addEventListener("dragleave", () => {
+        stateIdle.classList.remove("border-teal-500", "bg-teal-50");
+      });
+
+      // =========================
+      // DROP FILE
+      // =========================
+      stateIdle.addEventListener("drop", (e) => {
+        e.preventDefault();
+
+        stateIdle.classList.remove("border-teal-500", "bg-teal-50");
+
+        datasetInput.files = e.dataTransfer.files;
+
+        handleFiles(e.dataTransfer.files);
+      });
+
+      // =========================
+      // HANDLE FILE
+      // =========================
+      function handleFiles(files) {
+        // VALIDASI KOSONG
+        if (!files || files.length === 0) {
+          fileName.textContent = "❌ Tidak ada file dipilih";
+
+          fileName.classList.remove("hidden");
+
+          return;
+        }
+
+        const file = files[0];
+
+        // TAMPILKAN NAMA FILE
+        fileName.textContent = `📄 ${file.name}`;
+        fileName.classList.remove("hidden");
+
+        // VALIDASI CSV
+        if (!file.name.toLowerCase().endsWith(".csv")) {
+          fileName.textContent = "❌ File harus format CSV";
+
+          return;
+        }
+
+        // SHOW LOADING
+        showLoading("upload");
 
         // =========================
-        // INVALID
+        // FORM DATA
         // =========================
-        else if (data.status === 'invalid') {
+        const formData = new FormData();
 
+        formData.append("dataset", file);
+
+        // =========================
+        // FETCH UPLOAD
+        // =========================
+        fetch("/upload_dataset", {
+          method: "POST",
+          body: formData,
+        })
+          .then(async (res) => {
+            const data = await res.json();
+
+            if (!res.ok) {
+              throw data;
+            }
+
+            return data;
+          })
+
+          .then((data) => {
+            // =========================
+            // SKIPPED — dataset sudah pernah di-train
+            // =========================
+            if (data.status === "skipped") {
+                document.getElementById("stateLoading").classList.add("hidden");
+                stateIdle.classList.remove("hidden");
+
+                fileName.innerHTML = `✅ ${data.filename} sudah pernah di-train (${data.trained_at}). Model langsung dimuat.`;
+                fileName.classList.remove("hidden");
+
+                // Reload halaman supaya metrics & UI terupdate
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+            }
+
+              // =========================
+              // STARTED / VALID
+              // =========================
+              if (data.status === "started" || data.status === "valid") {
+                  document.getElementById("stateLoading").classList.add("hidden");
+
+                  stateIdle.classList.remove("hidden");
+
+                  // SEMBUNYIKAN TEXT DEFAULT
+                  stateIdle.querySelectorAll("p").forEach((el) => {
+                      if (el.id !== "fileName") {
+                          el.classList.add("hidden");
+                      }
+                  });
+
+                  // TAMPILKAN NAMA FILE
+                  fileName.innerHTML = `✅ ${data.filename} berhasil diupload. Training dimulai...`;
+                  fileName.classList.remove("hidden");
+
+                  // START TRAIN TOAST
+                  startTrainToast();
+
+                  console.log(data.info);
+              }
+
+              // =========================
+              // INVALID
+              // =========================
+              else if (data.status === "invalid") {
+                  showIdle();
+                  fileName.textContent = "❌ " + (data.errors || []).join(", ");
+                  fileName.classList.remove("hidden");
+                  console.log(data.errors);
+              }
+          })
+
+          // =========================
+          // ERROR
+          // =========================
+          .catch((err) => {
             showIdle();
 
-            fileName.textContent =
-                '❌ Dataset tidak valid';
+            // ERROR ARRAY
+            if (err.errors) {
+              fileName.textContent = "❌ " + err.errors.join(", ");
+            }
 
-            console.log(data.errors);
-        }
-    })
+            // ERROR MESSAGE
+            else if (err.message) {
+              fileName.textContent = "❌ " + err.message;
+            }
 
-    // =========================
-    // ERROR
-    // =========================
-    .catch((err) => {
+            // UNKNOWN
+            else {
+              fileName.textContent = "❌ Upload gagal";
+            }
 
-        showIdle();
+            console.error(err);
+          });
+      }
 
-        // ERROR ARRAY
-        if (err.errors) {
+      function showProgressToast() {
+        document.getElementById("progressToast").classList.remove("hidden");
+      }
 
-            fileName.textContent =
-                '❌ ' + err.errors.join(', ');
-        }
+      function hideProgressToast() {
+        document.getElementById("progressToast").classList.add("hidden");
+      }
 
-        // ERROR MESSAGE
-        else if (err.message) {
+      function updateProgressToast(day, total, eta, elapsed) {
+        const percent = Math.floor((day / total) * 100);
+        document.getElementById("toastBar").style.width = percent + "%";
+        document.getElementById("toastPercent").textContent = percent + "%";
+        document.getElementById("toastStatus").textContent =
+          `Generating Day ${day}/${total}`;
+        document.getElementById("toastETA").textContent =
+          `ETA ${eta} • Elapsed ${elapsed}`;
+      }
 
-            fileName.textContent =
-                '❌ ' + err.message;
-        }
+      async function generateCSV() {
+        showLoading("generate");
+        showProgressToast();
 
-        // UNKNOWN
-        else {
+        const selectedModel = document.querySelector(
+          'input[name="model"]:checked',
+        ).value;
+        const route =
+          selectedModel === "best" ? "/generate_best" : "/generate_full";
 
-            fileName.textContent =
-                '❌ Upload gagal';
-        }
+        try {
+          const res = await fetch(route);
+          const data = await res.json();
 
-        console.error(err);
-    });
-}
-
-function showProgressToast() {
-    document.getElementById("progressToast").classList.remove("hidden");
-}
-
-function hideProgressToast() {
-    document.getElementById("progressToast").classList.add("hidden");
-}
-
-function updateProgressToast(day, total, eta, elapsed) {
-    const percent = Math.floor((day / total) * 100);
-    document.getElementById("toastBar").style.width = percent + "%";
-    document.getElementById("toastPercent").textContent = percent + "%";
-    document.getElementById("toastStatus").textContent = `Generating Day ${day}/${total}`;
-    document.getElementById("toastETA").textContent = `ETA ${eta} • Elapsed ${elapsed}`;
-}
-
-async function generateCSV() {
-    showLoading('generate');
-    showProgressToast();
-
-    const selectedModel = document.querySelector('input[name="model"]:checked').value;
-    const route = selectedModel === "best" ? "/generate_best" : "/generate_full";
-
-    try {
-        const res  = await fetch(route);
-        const data = await res.json();
-
-        if (data.status === "already_running") {
+          if (data.status === "already_running") {
             hideProgressToast();
             alert("Generate masih berjalan, tunggu sebentar.");
-            document.getElementById('stateLoading').classList.add('hidden');
-            document.getElementById('stateIdle').classList.remove('hidden');
+            document.getElementById("stateLoading").classList.add("hidden");
+            document.getElementById("stateIdle").classList.remove("hidden");
             return;
+          }
+
+          // Mulai polling rekursif
+          _pollActive = true;
+          pollOnce();
+        } catch (err) {
+          console.error("Generate error:", err);
+          hideProgressToast();
+          document.getElementById("stateLoading").classList.add("hidden");
+          document.getElementById("stateIdle").classList.remove("hidden");
+          alert("Terjadi kesalahan saat memulai generate.");
         }
+      }
 
-        // Mulai polling rekursif
-        _pollActive = true;
-        pollOnce();
+      async function pollOnce() {
+        // Kalau sudah di-stop dari luar, berhenti
+        if (!_pollActive) return;
 
-    } catch (err) {
-        console.error("Generate error:", err);
-        hideProgressToast();
-        document.getElementById('stateLoading').classList.add('hidden');
-        document.getElementById('stateIdle').classList.remove('hidden');
-        alert("Terjadi kesalahan saat memulai generate.");
-    }
-}
+        try {
+          const res = await fetch("/generate_progress");
+          const prog = await res.json();
 
-async function pollOnce() {
-    // Kalau sudah di-stop dari luar, berhenti
-    if (!_pollActive) return;
+          console.log("Poll:", prog);
 
-    try {
-        const res  = await fetch("/generate_progress");
-        const prog = await res.json();
-
-        console.log("Poll:", prog);
-
-        // Update UI
-        document.getElementById("loadingTitle").textContent =
+          // Update UI
+          document.getElementById("loadingTitle").textContent =
             `Generating Day ${prog.day}/${prog.total}`;
-        updateProgressToast(prog.day, prog.total, prog.eta, prog.elapsed);
+          updateProgressToast(prog.day, prog.total, prog.eta, prog.elapsed);
 
-        // ── ERROR ──
-        if (prog.error) {
+          // ── ERROR ──
+          if (prog.error) {
             _pollActive = false;
             hideProgressToast();
-            document.getElementById('stateLoading').classList.add('hidden');
-            document.getElementById('stateIdle').classList.remove('hidden');
+            document.getElementById("stateLoading").classList.add("hidden");
+            document.getElementById("stateIdle").classList.remove("hidden");
             alert("Error: " + prog.error);
             return; // STOP, tidak jadwal pollOnce lagi
-        }
+          }
 
-        // ── DONE ──
-        if (prog.done) {
+          // ── DONE ──
+          if (prog.done) {
             _pollActive = false;
             hideProgressToast();
 
             try {
-                // Commit ke session Flask — await sampai benar-benar selesai
-                const commitRes  = await fetch("/generate_commit", { method: "POST" });
-                const commitData = await commitRes.json();
-                console.log("Commit:", commitData);
+              // Commit ke session Flask — await sampai benar-benar selesai
+              const commitRes = await fetch("/generate_commit", {
+                method: "POST",
+              });
+              const commitData = await commitRes.json();
+              console.log("Commit:", commitData);
             } catch (commitErr) {
-                console.warn("Commit gagal:", commitErr);
+              console.warn("Commit gagal:", commitErr);
             }
 
             // Reload setelah commit confirmed selesai
             window.location.reload();
             return; // STOP, tidak jadwal pollOnce lagi
+          }
+
+          // ── MASIH RUNNING — jadwal poll berikutnya ──
+          // setTimeout bukan setInterval: poll berikutnya baru dijadwal
+          // SETELAH poll sekarang selesai — tidak ada overlap
+          setTimeout(pollOnce, 1500);
+        } catch (pollErr) {
+          console.error("Poll error:", pollErr);
+          _pollActive = false;
+          hideProgressToast();
+          document.getElementById("stateLoading").classList.add("hidden");
+          document.getElementById("stateIdle").classList.remove("hidden");
+          alert("Polling gagal: " + pollErr.message);
+        }
+      }
+
+      function downloadCSV() {
+        const modeInput = document.getElementById("lastGenerateMode");
+        const mode = modeInput ? modeInput.value : "general";
+        window.location.href =
+          mode === "best" ? "/download_full/best" : "/download_full/general";
+      }
+
+      async function resetToIdle() {
+        // Hapus dari session Flask dulu
+        try {
+          await fetch("/reset_nlp", { method: "POST" });
+        } catch (e) {
+          console.warn("Reset session gagal:", e);
         }
 
-        // ── MASIH RUNNING — jadwal poll berikutnya ──
-        // setTimeout bukan setInterval: poll berikutnya baru dijadwal
-        // SETELAH poll sekarang selesai — tidak ada overlap
-        setTimeout(pollOnce, 1500);
+        // Baru hide di DOM
+        const nlpBox = document.getElementById("stateNlp");
+        if (nlpBox) nlpBox.classList.add("hidden");
+        document.getElementById("stateIdle").classList.remove("hidden");
+      }
 
-    } catch (pollErr) {
-        console.error("Poll error:", pollErr);
-        _pollActive = false;
-        hideProgressToast();
-        document.getElementById('stateLoading').classList.add('hidden');
-        document.getElementById('stateIdle').classList.remove('hidden');
-        alert("Polling gagal: " + pollErr.message);
-    }
-}
+      async function resetDataset() {
+          if (!confirm("Reset dataset? Model akan kembali ke kondisi awal dan perlu upload ulang.")) return;
 
-function downloadCSV() {
-    const modeInput = document.getElementById('lastGenerateMode');
-    const mode = modeInput ? modeInput.value : "general";
-    window.location.href = mode === "best" ? "/download_full/best" : "/download_full/general";
-}
-
-async function resetToIdle() {
-    // Hapus dari session Flask dulu
-    try {
-        await fetch("/reset_nlp", { method: "POST" });
-    } catch(e) {
-        console.warn("Reset session gagal:", e);
-    }
-
-    // Baru hide di DOM
-    const nlpBox = document.getElementById('stateNlp');
-    if (nlpBox) nlpBox.classList.add('hidden');
-    document.getElementById('stateIdle').classList.remove('hidden');
-}
-</script>
-</body>
+          try {
+              await fetch("/reset_dataset", { method: "POST" });
+              window.location.reload();
+          } catch (e) {
+              alert("Gagal reset dataset: " + e.message);
+          }
+      }
+    </script>
+  </body>
 </html>
