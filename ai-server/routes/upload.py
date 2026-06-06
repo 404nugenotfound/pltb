@@ -34,19 +34,17 @@ upload_bp = Blueprint(
 )
 def upload_dataset():
 
+    username = session.get("username")
+
     with train_lock:
 
-        if train_progress.get("running"):
+        if train_progress.get(username, {}).get("running"):
 
             return jsonify({
-
                 "status": "error",
-
-                "message":
-                "Training sedang berjalan"
-
+                "message": "Training sedang berjalan"
             }), 409
-
+            
     # =========================
     # VALIDASI FILE
     # =========================
@@ -176,17 +174,19 @@ def upload_dataset():
     # START TRAIN
     # =========================
     with train_lock:
-        train_progress.update({
+        train_progress[username] = {
             "running": True,
             "step": "Memulai training...",
             "done": False,
             "error": None,
-            "log": []
-        })
+            "log": [],
+            "cancel": False
+        }
 
     threading.Thread(
         target=worker_retrain,
         args=(
+            username,
             final_path,
             train_progress,
             train_lock
@@ -203,18 +203,70 @@ def upload_dataset():
 # =========================
 # TRAIN PROGRESS
 # =========================
-@upload_bp.route(
-    "/train_progress"
-)
+@upload_bp.route("/train_progress")
 def get_train_progress():
+
+    username = session.get("username")
 
     with train_lock:
 
-        p = train_progress.copy()
+        p = train_progress.get(
+            username,
+            {
+                "running": False,
+                "step": "",
+                "done": False,
+                "cancelled": False,
+                "error": None,
+                "log": []
+            }
+        )
 
     return jsonify(p)
 
+# =========================
+# CANCEL TRAINING
+# =========================
+@upload_bp.route(
+    "/cancel_training",
+    methods=["POST"]
+)
+def cancel_training():
 
+    username = session.get("username")
+
+    with train_lock:
+
+        if username in train_progress:
+
+            train_progress[username]["cancel"] = True
+
+    return jsonify({
+        "status": "cancel_requested"
+    })
+ 
+# =========================
+# CLEAR TRAIN PROGRESS
+# =========================
+@upload_bp.route(
+    "/clear_train_progress",
+    methods=["POST"]
+)
+def clear_train_progress():
+
+    username = session.get("username")
+
+    with train_lock:
+
+        train_progress.pop(
+            username,
+            None
+        )
+
+    return jsonify({
+        "status": "cleared"
+    })
+ 
 # =========================
 # CANCEL UPLOAD
 # =========================
@@ -265,3 +317,15 @@ def dataset_info():
             != DEFAULT_DATASET
 
     })
+    
+# =========================
+# DOWNLOAD TEMPLATE
+# =========================
+@upload_bp.route("/download_template")
+def download_template():
+    path = os.path.join("Dataset", "NASA Bawean Hourly.csv")
+    return send_file(
+        os.path.abspath(path),
+        as_attachment=True,
+        download_name="template_dataset.csv"
+    )

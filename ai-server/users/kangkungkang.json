@@ -4,25 +4,8 @@
   "password": "masukin123",
   "role": "user",
   "name": "nailajah69",
-  "active_dataset": "C:\\xampp\\htdocs\\pltb-brin\\ai-server\\uploads\\NASA_Pandeglang_Hourly.csv",
+  "active_dataset": "C:\\xampp\\htdocs\\pltb-brin\\ai-server\\uploads\\NASA_Sukabumi_Hourly.csv",
   "history": [
-    {
-      "entry": {
-        "id": 1780484147402,
-        "waktu": "3/6/2026, 17.55.47",
-        "file": "NASA_Situbondo_Hourly.csv",
-        "algo": "General Model",
-        "periode": "1 Jam",
-        "hasil": [
-          {
-            "label": "BiLSTM:",
-            "value": "14.30 MW"
-          }
-        ],
-        "status": "Selesai",
-        "nlp_report": "Prediksi kecepatan angin untuk periode 01-01-2023 hingga 08-01-2023 menunjukkan rata-rata 6.90 m/s, termasuk kategori angin segar. Kecepatan tertinggi mencapai 7.66 m/s dan terendah 6.69 m/s, dengan standar deviasi 0.24 m/s. Angin cenderung paling kuat sekitar pukul 08:00 dan paling lemah sekitar pukul 05:00. Secara umum tren angin menurun menuju akhir periode. \n\nModel terbaik adalah XGB dengan MAPE 2.18% dan RMSE 0.085. Tingkat akurasi model tergolong tinggi."
-      }
-    },
     {
       "entry": {
         "id": 1780482253340,

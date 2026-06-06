@@ -100,17 +100,25 @@ export default function EditProfilePage() {
 }
 
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result as string;
-      setAvatar(result);
-      setAvatarError(false);
-      sessionStorage.setItem("ventara_avatar", result);
-    };
-    reader.readAsDataURL(file);
-  }
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = async () => {
+    const result = reader.result as string;
+    setAvatar(result);
+    setAvatarError(false);
+    sessionStorage.setItem("ventara_avatar", result);
+
+    const currentUsername = sessionStorage.getItem("ventara_username") || username; // ← fix
+    await fetch("http://localhost:5000/update_profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ username: currentUsername, avatar: result }),
+    });
+  };
+  reader.readAsDataURL(file);
+}
 
   const displayAvatar = avatarError || !avatar ? DEFAULT_AVATAR : avatar;
 

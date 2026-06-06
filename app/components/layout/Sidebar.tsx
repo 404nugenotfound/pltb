@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { useTraining } from "@/app/context/TrainingContext";
 
 import { Bebas_Neue } from "next/font/google";
 
@@ -14,7 +15,7 @@ const bebasNeue = Bebas_Neue({
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-
+  const { cancelTraining, stopTraining } = useTraining();
   const [role, setRole] = useState<"user" | "admin">("user");
   const [name, setName] = useState("User");
   const [open, setOpen] = useState(false);
@@ -47,13 +48,20 @@ export default function Sidebar() {
   async function handleLogout() {
   setProfileOpen(false);
 
+  // Stop toast & cancel training dulu
+  stopTraining(); // langsung hilangkan banner
+  try {
+    await cancelTraining(); // cancel di Flask
+  } catch (e) {
+    console.error("Cancel training on logout failed:", e);
+  }
+
   await fetch("http://localhost:5000/logout", {
     method: "POST",
     credentials: "include",
   });
 
   sessionStorage.clear();
-
   router.push("/");
 }
 

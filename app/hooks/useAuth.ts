@@ -39,6 +39,7 @@ export function useAuth() {
     sessionStorage.setItem("ventara_name", data.name);
     sessionStorage.setItem("ventara_username", data.username);
     sessionStorage.setItem("ventara_email", data.email || "");
+    sessionStorage.setItem("ventara_avatar", data.avatar || "");
     document.cookie = `ventara_username=${data.username}; path=/; SameSite=Lax`; // ← tambah ini
 
     router.push(

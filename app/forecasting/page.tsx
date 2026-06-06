@@ -86,6 +86,22 @@ export default function ForecastingPage() {
               <p className="text-xs text-teal-600 mt-1 font-medium">
                 Dataset Aktif: {dataset_name}
               </p>
+
+              <div className="flex justify-end">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open("http://localhost:5000/download_template", "_blank");
+                }}
+                className="mt-1 inline-flex items-center gap-1.5 text-sm text-teal-800 hover:text-teal-500 px-3 py-1.5 transition-colors cursor-pointer underline"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
+                    d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Download Template Dataset
+              </button>
+            </div>
             </div>
 
             {/* STATUS BOX */}
@@ -205,6 +221,7 @@ export default function ForecastingPage() {
 
               {/* BUTTON */}
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                {/* GENERATE */}
                 <button
                   onClick={() =>
                     startGenerate(

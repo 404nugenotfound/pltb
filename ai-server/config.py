@@ -8,11 +8,10 @@ ARCHIVE_FOLDER = "uploads/archive"
 ALLOWED_EXTENSIONS = {"csv"}
 
 TARGET = "WS10M"
-TRAIN_VARS = ["WS10M", "WD10M", "T2M"]
+TRAIN_VARS = ["WS10M", "WD10M", "RH2M"]
 
 
 DEFAULT_DATASET = "Dataset/NASA Bawean Hourly.csv"
-
 ACTIVE_DATASET_FILE = os.path.join(
     UPLOAD_FOLDER,
     "active_dataset.txt"
@@ -25,7 +24,7 @@ REQUIRED_COLUMNS = [
     "HR",
     "WS10M",
     "WD10M",
-    "T2M"
+    "RH2M"
 ]
 
 STEP = 48

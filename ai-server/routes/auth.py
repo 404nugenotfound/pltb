@@ -2,7 +2,12 @@ from flask import Blueprint, request, jsonify, session
 import json
 import os
 from utils.recaptcha import verify_recaptcha
-from utils.progress import generate_progress
+from utils.progress import (
+    generate_progress,
+    train_progress,
+    progress_lock,
+    train_lock
+)
 from utils.user_helpers import load_user, save_user, user_path
 
 auth_bp = Blueprint("auth_bp", __name__)
@@ -140,6 +145,13 @@ def login():
         user = load_user(username)
         if user and user["password"] == password:
             found = user
+    
+    if not found:
+        all_users = load_all_users()
+        found = next(
+            (u for u in all_users if u.get("email") == username and u["password"] == password),
+            None
+        )
 
     if not found:
         return jsonify({"success": False, "message": "Wrong username or password."}), 401
@@ -160,24 +172,29 @@ def login():
         "name":     found["name"],
         "username": found["username"],
         "email":    found.get("email", ""),
-        "dataset": found.get("active_dataset", "")  # ← tambah
+        "dataset": found.get("active_dataset", ""),
+        "avatar":   found.get("avatar", "")
     })
 
+# =========================
+# LOGOUT
+# =========================
 @auth_bp.route("/logout", methods=["POST"])
 def logout():
 
-    print("BEFORE LOGOUT =", generate_progress)
-
     username = session.get("username")
 
-    if username in generate_progress:
-        del generate_progress[username]
+    with progress_lock:
+        generate_progress.pop(username, None)
+
+    with train_lock:
+        train_progress.pop(username, None)
 
     session.clear()
 
-    print("AFTER LOGOUT =", generate_progress)
-
-    return jsonify({"success": True})
+    return jsonify({
+        "success": True
+    })
 
 # =========================
 # UPDATE PROFILE (user only)
@@ -190,7 +207,8 @@ def update_profile():
     username  = data.get("username", "").strip()
     new_name  = data.get("name", "").strip()
     new_email = data.get("email", "").strip()
-
+    new_avatar = data.get("avatar", "").strip()
+    
     # if not verify_recaptcha(token):
     #     return jsonify({"success": False, "message": "Captcha verification failed."}), 400
 
@@ -208,6 +226,9 @@ def update_profile():
         user["name"] = new_name
     if new_email:
         user["email"] = new_email
+    if new_avatar:
+        user["avatar"] = new_avatar
+        print(f"DEBUG avatar length: {len(new_avatar)}")
 
     save_user(user)
 

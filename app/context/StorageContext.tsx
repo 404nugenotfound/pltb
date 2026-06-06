@@ -56,8 +56,11 @@ export function StorageProvider({
   };
 
   useEffect(() => {
+  const username = sessionStorage.getItem("ventara_username");
+  if (username) {  // ← hanya fetch kalau sudah login
     refreshStorage();
-  }, []);
+  }
+}, []);
 
   return (
     <StorageContext.Provider

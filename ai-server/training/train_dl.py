@@ -2,174 +2,135 @@ import os
 import joblib
 import traceback
 import numpy as np
-
 from sklearn.preprocessing import MinMaxScaler
+from config import MODEL_FOLDER, TARGET, STEP, TRAIN_VARS
 
-from config import (
-    MODEL_FOLDER,
-    TARGET,
-    STEP,
-    TRAIN_VARS
-)
 
-def train_dl_models(df, target_var: str = None):
+def train_dl_models(df, target_var: str = None, cancel_check=None):
     if target_var is None:
         target_var = TARGET
-        
+
     try:
-
         import tensorflow as tf
-
         from tensorflow.keras.models import Sequential
+        from tensorflow.keras.layers import LSTM as KerasLSTM, Bidirectional, Dense, Dropout
+        from tensorflow.keras.callbacks import EarlyStopping, Callback
 
-        from tensorflow.keras.layers import (
-            LSTM as KerasLSTM,
-            Bidirectional,
-            Dense,
-            Dropout
-        )
+        # ✅ Paksa CPU saja — hindari GPU memory conflict antar thread
+        tf.config.set_visible_devices([], 'GPU')
 
-        from tensorflow.keras.callbacks import (
-            EarlyStopping
-        )
-        
+        class CancelCallback(Callback):
+            def __init__(self, check_fn):
+                super().__init__()
+                self.check_fn = check_fn
+
+            def on_epoch_end(self, epoch, logs=None):
+                if self.check_fn():
+                    print("🛑 Training DL dihentikan via cancel")
+                    self.model.stop_training = True
+
         if target_var not in df.columns:
-            print(f"⚠️ Kolom {target_var} tidak ada di dataset, skip DL")
+            print(f"⚠️ Kolom {target_var} tidak ada, skip DL")
             return False
 
-        dl_cols = [c for c in df.columns if c != target_var]
-
+        dl_cols  = [c for c in df.columns if c != target_var]
         scaler_X = MinMaxScaler()
         scaler_y = MinMaxScaler()
 
-        X_scaled = scaler_X.fit_transform(
-            df[dl_cols].values
-        ).astype(np.float32)
+        X_scaled = scaler_X.fit_transform(df[dl_cols].values).astype(np.float32)
+        y_scaled = scaler_y.fit_transform(df[target_var].values.reshape(-1, 1)).astype(np.float32)
 
-        y_scaled = scaler_y.fit_transform(
-            df[target_var].values.reshape(-1, 1)
-        ).astype(np.float32)
-
-        seqs = []
-        targets = []
-
-        for i in range(STEP, len(X_scaled)):
-
-            seqs.append(
-                X_scaled[i - STEP:i]
-            )
-
-            targets.append(
-                y_scaled[i]
-            )
-
-        seqs = np.array(
-            seqs,
-            dtype=np.float32
-        )
-
-        targets = np.array(
-            targets,
-            dtype=np.float32
-        )
+        # ✅ Vectorized sequence building — jauh lebih cepat dari loop Python
+        n        = len(X_scaled)
+        indices  = np.arange(STEP, n)
+        seqs     = np.array([X_scaled[i - STEP:i] for i in indices], dtype=np.float32)
+        targets  = y_scaled[STEP:]
 
         n_feat = seqs.shape[2]
+        suffix = f"_{target_var}"
+
+        # ✅ Split train/val manual — lebih efisien dari validation_split
+        split     = int(len(seqs) * 0.9)
+        X_train, X_val = seqs[:split],   seqs[split:]
+        y_train, y_val = targets[:split], targets[split:]
 
         es = EarlyStopping(
             monitor="val_loss",
-            patience=5,
+            patience=3,           # ✅ turun dari 5 → 3, stop lebih cepat
             restore_best_weights=True
         )
-        suffix = f"_{target_var}"
+
+        callbacks = [es]
+        if cancel_check:
+            callbacks.append(CancelCallback(cancel_check))
+
+        # ✅ Fungsi build model — hindari duplikasi kode
+        def build_and_train(model, name):
+            model.compile(optimizer="adam", loss="mse")
+            model.fit(
+                X_train, y_train,
+                validation_data=(X_val, y_val),
+                epochs=20,
+                batch_size=256,   # ✅ naik dari 128 → 256, lebih cepat per epoch
+                callbacks=callbacks,
+                verbose=1
+            )
+            model.save(f"{MODEL_FOLDER}/{name}{suffix}.h5")
+            print(f"✅ {name}{suffix} disimpan")
 
         # =========================
         # LSTM
         # =========================
         lstm = Sequential([
             KerasLSTM(64, return_sequences=True, input_shape=(STEP, n_feat)),
-            KerasLSTM(64),  # stacked
+            KerasLSTM(32),        # ✅ turun dari 64 → 32, lebih ringan
             Dropout(0.2),
-            Dense(32, activation="relu"),
+            Dense(16, activation="relu"),  # ✅ turun dari 32 → 16
             Dense(1)
         ])
+        build_and_train(lstm, "lstm")
 
-        lstm.compile(
-            optimizer="adam",
-            loss="mse"
-        )
-
-        lstm.fit(
-            seqs,
-            targets,
-            epochs=20,
-            batch_size=128,
-            validation_split=0.1,
-            callbacks=[es],
-            verbose=1
-        )
-
-        lstm.save(
-            f"{MODEL_FOLDER}/lstm{suffix}.h5"
-        )
+        # ✅ Clear session sebelum build model berikutnya — bebaskan memory
+        tf.keras.backend.clear_session()
 
         # =========================
         # BiLSTM
         # =========================
         bilstm = Sequential([
-            Bidirectional(
-                KerasLSTM(64)
-            ),
-
+            Bidirectional(KerasLSTM(64, input_shape=(STEP, n_feat))),
             Dropout(0.2),
-
-            Dense(
-                32,
-                activation="relu"
-            ),
-
+            Dense(16, activation="relu"),  # ✅ turun dari 32 → 16
             Dense(1)
         ])
 
-        bilstm.compile(
-            optimizer="adam",
-            loss="mse"
-        )
+        # ✅ Reload callbacks karena clear_session
+        callbacks = [
+            EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True)
+        ]
+        if cancel_check:
+            callbacks.append(CancelCallback(cancel_check))
 
+        bilstm.compile(optimizer="adam", loss="mse")
         bilstm.fit(
-            seqs,
-            targets,
+            X_train, y_train,
+            validation_data=(X_val, y_val),
             epochs=20,
-            batch_size=128,
-            validation_split=0.1,
-            callbacks=[es],
+            batch_size=256,
+            callbacks=callbacks,
             verbose=1
         )
+        bilstm.save(f"{MODEL_FOLDER}/bilstm{suffix}.h5")
+        print(f"✅ bilstm{suffix} disimpan")
 
-        bilstm.save(
-            f"{MODEL_FOLDER}/bilstm{suffix}.h5"
-        )
-
-        joblib.dump(
-            scaler_X,
-            f"{MODEL_FOLDER}/scaler_X{suffix}.pkl"
-        )
-
-        joblib.dump(
-            scaler_y,
-            f"{MODEL_FOLDER}/scaler_y{suffix}.pkl"
-        )
-        joblib.dump(
-            dl_cols,
-            f"{MODEL_FOLDER}/dl_cols{suffix}.pkl"
-            )
+        # ✅ Simpan scaler dan dl_cols
+        joblib.dump(scaler_X, f"{MODEL_FOLDER}/scaler_X{suffix}.pkl")
+        joblib.dump(scaler_y, f"{MODEL_FOLDER}/scaler_y{suffix}.pkl")
+        joblib.dump(dl_cols,  f"{MODEL_FOLDER}/dl_cols{suffix}.pkl")
 
         print(f"✅ DL training selesai untuk {target_var}")
         return True
 
     except Exception as e:
-
         print(f"⚠️ DL training gagal untuk {target_var}: {e}")
-
         traceback.print_exc()
-
         return False

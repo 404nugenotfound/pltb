@@ -2,9 +2,11 @@
 
 import { usePathname } from "next/navigation";
 import { useTraining } from "@/app/context/TrainingContext";
+import { cancelTraining } from "@/app/lib/api";
 
 export default function TrainingBanner() {
-  const { training } = useTraining();   
+  const { training, cancelTraining } = useTraining();
+
   const pathname = usePathname();
 
   // Secara Global, tampilkan banner jika sedang training
@@ -37,16 +39,31 @@ export default function TrainingBanner() {
             {training.logs.length === 0 ? (
               <p className="text-gray-500">Menunggu log...</p>
             ) : (
-              training.logs.map((log, idx) => (
-                <p key={idx}>{log}</p>
-              ))
+              training.logs.map((log, idx) => <p key={idx}>{log}</p>)
             )}
           </div>
         </div>
 
         {/* FOOTER */}
-        <div className="px-4 py-2 bg-gray-800 text-xs text-gray-400 text-center">
-          {training.footer}
+        <div className="px-4 py-2 bg-gray-800">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">{training.footer}</span>
+
+            <button
+              onClick={cancelTraining}
+              className="
+                text-xs
+                px-2
+                py-1
+                rounded-md
+                bg-red-500
+                hover:bg-red-600
+                text-white
+              "
+            >
+              Cancel
+            </button>
+          </div>
         </div>
       </div>
     </div>

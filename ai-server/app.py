@@ -85,68 +85,43 @@ app.register_blueprint(cache_settings_bp)
 # LOAD DATASET
 # =========================
 _dataset_path = get_active_dataset_path()
-
 df = load_and_engineer(
-    _dataset_path
+    _dataset_path,
+    target_var=TARGET    # ✅ tambah ini
 )
-
 print(
     f"✅ Dataset loaded: "
     f"{_dataset_path} "
     f"({len(df)} rows)"
 )
-
 # =========================
 # INIT ML
 # =========================
 ml_state = init_ml_state(df)
-
-gbr = ml_state["gbr"]
-
-xgb = ml_state["xgb"]
-
-knn = ml_state["knn"]
-
-scaler = ml_state["scaler"]
-
+gbr      = ml_state["gbr"]
+xgb      = ml_state["xgb"]
+knn      = ml_state["knn"]
+scaler   = ml_state["scaler"]
 FEATURES = ml_state["FEATURES"]
-
 ML_READY = ml_state["ML_READY"]
-
-X = ml_state["X"]
-
-y = ml_state["y"]
-
-data_ml = ml_state["data_ml"]
-
-print(
-    f"✅ ML Ready: {ML_READY}"
-)
+X        = ml_state["X"]
+y        = ml_state["y"]
+data_ml  = ml_state["data_ml"]
+print(f"✅ ML Ready: {ML_READY}")
 
 # =========================
 # INIT DL
 # =========================
-dl_state = init_dl_models(df)
-
-lstm = dl_state["lstm"]
-
-bilstm = dl_state["bilstm"]
-
-scaler_X = dl_state["scaler_X"]
-
-scaler_y = dl_state["scaler_y"]
-
-X_scaled = dl_state["X_scaled"]
-
-data_seq = dl_state["data_seq"]
-
+dl_state      = init_dl_models(df, target_var=TARGET)    # ✅ tambah ini
+lstm          = dl_state["lstm"]
+bilstm        = dl_state["bilstm"]
+scaler_X      = dl_state["scaler_X"]
+scaler_y      = dl_state["scaler_y"]
+X_scaled      = dl_state["X_scaled"]
+data_seq      = dl_state["data_seq"]
 DL_INPUT_COLS = dl_state["DL_INPUT_COLS"]
-
-DL_READY = dl_state["DL_READY"]
-
-print(
-    f"✅ DL Ready: {DL_READY}"
-)
+DL_READY      = dl_state["DL_READY"]
+print(f"✅ DL Ready: {DL_READY}")
 
 # =========================
 # LOAD METRICS
@@ -164,7 +139,8 @@ metrics, metrics_dl = (
         X_scaled,
         scaler_y,
         lstm,
-        bilstm
+        bilstm,
+        var_name=TARGET
     )
 )
 

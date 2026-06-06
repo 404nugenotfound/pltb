@@ -1,7 +1,11 @@
 "use client";
 
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
-import { fetchTrainProgress } from "@/app/lib/api";
+import {
+  fetchTrainProgress,
+  clearTrainProgress,
+  cancelTraining as cancelTrainingApi,
+} from "@/app/lib/api";
 
 interface TrainingState {
   isTraining: boolean;
@@ -15,6 +19,7 @@ interface TrainingContextValue {
   training: TrainingState;
   startTraining: (onComplete?: () => void) => void;
   stopTraining: () => void;
+  cancelTraining: () => Promise<void>;
 }
 
 const DEFAULT_STATE: TrainingState = {
@@ -24,8 +29,6 @@ const DEFAULT_STATE: TrainingState = {
   logs: [],
   footer: "",
 };
-
-const STORAGE_KEY = "ventara_training";
 
 const TRAIN_STEPS = [
   "Load dataset",
@@ -51,24 +54,15 @@ const TrainingContext = createContext<TrainingContextValue | null>(null);
 export function TrainingProvider({ children }: { children: React.ReactNode }) {
   const [training, setTraining] = useState<TrainingState>(DEFAULT_STATE);
 
-useEffect(() => {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return;
-    const parsed: TrainingState = JSON.parse(saved);
-    if (!parsed.isTraining || parsed.progress >= 100) return;
-    setTraining(parsed);
-  } catch {
-    // ignore
-  }
-}, []);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const stopTraining = useCallback(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+
     setTraining(DEFAULT_STATE);
-    localStorage.removeItem(STORAGE_KEY);
   }, []);
 
   const poll = useCallback((onComplete?: () => void) => {
@@ -76,6 +70,11 @@ useEffect(() => {
 
     intervalRef.current = setInterval(async () => {
       try {
+        const username = sessionStorage.getItem("ventara_username");
+      if (!username) { 
+        stopTraining();
+        return;
+      }
         const data = await fetchTrainProgress();
 
         const next: TrainingState = {
@@ -89,6 +88,12 @@ useEffect(() => {
         if (data.done && !data.running) {
           clearInterval(intervalRef.current!);
 
+          if (data.cancelled) {
+            await clearTrainProgress();
+            stopTraining();
+            return;
+          }
+
           if (data.error) {
             stopTraining();
           } else {
@@ -98,9 +103,9 @@ useEffect(() => {
               footer: "✅ Training selesai!",
             };
             setTraining(doneState);
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(doneState));
 
-            setTimeout(() => {
+            setTimeout(async () => {
+              await clearTrainProgress();
               stopTraining();
               onComplete?.();
             }, 2000);
@@ -109,7 +114,6 @@ useEffect(() => {
         }
 
         setTraining(next);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       } catch (e) {
         console.log("Train polling skip:", e);
       }
@@ -125,23 +129,58 @@ useEffect(() => {
       footer: "Jangan tutup halaman ini",
     };
     setTraining(initial);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
     poll(onComplete);
   }, [poll]);
 
-  // Resume polling kalau ada state tersimpan (refresh / balik ke halaman)
   useEffect(() => {
-    if (training.isTraining && training.progress < 100) {
-      poll(() => window.location.reload());
-    }
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+    const init = async () => {
+      try {
+        const data = await fetchTrainProgress();
+
+        if (data.running) {
+          poll(() => window.location.reload());
+        }
+      } catch (err) {
+        console.error(err);
+      }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+
+    init();
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [poll]);
+  
+  const cancelTraining = useCallback(async () => {
+  // Stop polling dulu biar tidak override state
+  if (intervalRef.current) {
+    clearInterval(intervalRef.current);
+    intervalRef.current = null;
+  }
+
+  try {
+    await cancelTrainingApi();
+    await clearTrainProgress();
+  } catch (e) {
+    console.error("Cancel failed:", e);
+  } finally {
+    // Reset state apapun yang terjadi
+    setTraining(DEFAULT_STATE);
+  }
+}, []);
 
   return (
-    <TrainingContext.Provider value={{ training, startTraining, stopTraining }}>
+    <TrainingContext.Provider
+        value={{
+          training,
+          startTraining,
+          stopTraining,
+          cancelTraining
+        }}
+      >
       {children}
     </TrainingContext.Provider>
   );

@@ -8,13 +8,7 @@ generate_progress = {}
 # =========================
 # TRAIN PROGRESS
 # =========================
-train_progress = {
-    "running": False,
-    "step": "",
-    "done": False,
-    "error": None,
-    "log": []
-}
+train_progress = {}
 
 progress_lock = Lock()
 
