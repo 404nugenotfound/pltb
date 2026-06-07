@@ -51,6 +51,15 @@ def init_dl_models(df_ref, target_var: str = None):
             dl_cols = list(scaler_X.feature_names_in_)
         else:
             dl_cols = [c for c in df_ref.columns if c != target_var]
+            
+        # Tambahkan ini ↓
+        DEFAULT_FILL = {"PS": 101.325}
+        for col, val in DEFAULT_FILL.items():
+            if col not in df_ref.columns:
+                df_ref = df_ref.copy()
+                df_ref[col] = val
+                print(f"⚠️ Kolom '{col}' tidak ada di df, diisi default {val}")
+
 
         missing = [c for c in dl_cols if c not in df_ref.columns]
         if missing:

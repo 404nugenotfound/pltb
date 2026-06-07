@@ -133,31 +133,43 @@ def overview():
 # =========================
 @main_bp.route("/forecasting_data")
 def forecasting_data():
-    from app import metrics, metrics_dl
+    import app as _app
     from utils.user_helpers import load_user
+    from training.metrics import load_metrics_for_var, load_dl_metrics_for_var
+    from config import TARGET
 
     username = request.headers.get("X-Username") or session.get("username")
-    print(f"🔍 USERNAME: {username}")  # ← tambah
 
-    all_metrics = {**metrics, **metrics_dl}
-    best_model_names = get_best_ml_and_dl(metrics, metrics_dl)
+    # ✅ Baca langsung dari metrics.json per variabel — selalu fresh
+    from config import TRAIN_VARS
+    all_metrics = {}
+    for var in TRAIN_VARS:
+        ml_v  = load_metrics_for_var(var)
+        dl_v  = load_dl_metrics_for_var(var)
+        all_metrics.update(ml_v)
+        all_metrics.update(dl_v)
+
+    # Fallback ke app global kalau metrics.json kosong
+    if not all_metrics:
+        all_metrics = {**_app.metrics, **_app.metrics_dl}
+
+    best_model_names = get_best_ml_and_dl(
+        load_metrics_for_var(TARGET),
+        load_dl_metrics_for_var(TARGET)
+    )
 
     dataset_name = ""
     if username:
         user = load_user(username)
-        print(f"🔍 USER DATASET: {user.get('active_dataset', '') if user else 'None'}")  # ← tambah
         if user:
             dataset_name = os.path.basename(user.get("active_dataset", ""))
-
     if not dataset_name:
         dataset_name = os.path.basename(get_active_dataset_path() or "")
 
-    print(f"🔍 DATASET NAME: {dataset_name}")  # ← tambah
-
     return jsonify({
         "dataset_name": dataset_name,
-        "metrics": all_metrics,
-        "best_models": best_model_names
+        "metrics":      all_metrics,
+        "best_models":  best_model_names
     })
     
 # =========================

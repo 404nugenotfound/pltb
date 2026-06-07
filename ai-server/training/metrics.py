@@ -11,10 +11,18 @@ METRICS_PATH = f"{MODEL_FOLDER}/metrics.json"
 def get_metrics(y_true, y_pred):
     yt = np.array(y_true).flatten()
     yp = np.array(y_pred).flatten()
+
+    # ✅ Filter y_true == 0 biar tidak inf/nan di MAPE
+    mask = yt != 0
+    if mask.sum() > 0:
+        mape = round(float(np.mean(np.abs((yt[mask] - yp[mask]) / yt[mask])) * 100), 2)
+    else:
+        mape = float("nan")
+
     return {
         "MAE":  round(float(mean_absolute_error(yt, yp)), 3),
         "RMSE": round(float(np.sqrt(mean_squared_error(yt, yp))), 3),
-        "MAPE": round(float(np.mean(np.abs((yt - yp) / yt)) * 100), 2),
+        "MAPE": mape,
         "R2":   round(float(r2_score(yt, yp)), 3)
     }
 

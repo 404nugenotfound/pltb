@@ -17,12 +17,24 @@ export default function EditProfilePage() {
   const [avatar, setAvatar] = useState(DEFAULT_AVATAR);
   const [avatarError, setAvatarError] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [saveMsg, setSaveMsg] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [passwordMsg, setPasswordMsg] = useState("");
   const [savingPassword, setSavingPassword] = useState(false);
+  const [showCurrentPw, setShowCurrentPw] = useState(false);
+  const [showNewPw, setShowNewPw] = useState(false);
+  const [showConfirmPw, setShowConfirmPw] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<string | null>(null);
+
+  const [toast, setToast] = useState<{
+    msg: string;
+    type: "success" | "error";
+  } | null>(null);
+
+  function showToast(msg: string, type: "success" | "error") {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  }
 
   useEffect(() => {
     setUsername(sessionStorage.getItem("ventara_username") || "");
@@ -33,92 +45,91 @@ export default function EditProfilePage() {
 
   async function handleSave() {
     setSaving(true);
-    setSaveMsg("");
     try {
       const res = await fetch("http://localhost:5000/update_profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ username, name, email }),
+        body: JSON.stringify({
+          username,
+          name,
+          email,
+          avatar: avatarFile ?? undefined,  // ✅ kirim kalau ada perubahan
+        }),
       });
       const data = await res.json();
       if (!data.success) {
-        setSaveMsg("❌ " + data.message);
+        showToast(data.message, "error");
         return;
       }
       sessionStorage.setItem("ventara_name", data.name);
       sessionStorage.setItem("ventara_email", data.email);
-      setSaveMsg("✅ Profil berhasil disimpan!");
+      if (avatarFile) {
+        sessionStorage.setItem("ventara_avatar", avatarFile);  // ✅ simpan ke session setelah berhasil
+        setAvatarFile(null);
+      }
+      showToast("Profil berhasil disimpan!", "success");
       setTimeout(() => router.push("/settings"), 1500);
     } catch {
-      setSaveMsg("❌ Gagal terhubung ke server.");
+      showToast("Gagal terhubung ke server.", "error");
     } finally {
       setSaving(false);
     }
   }
 
   async function handleSavePassword() {
-  if (!currentPassword || !newPassword || !confirmPassword) {
-    setPasswordMsg("❌ Semua field password harus diisi.");
-    return;
-  }
-  if (newPassword !== confirmPassword) {
-    setPasswordMsg("❌ Password baru tidak cocok.");
-    return;
-  }
-  if (newPassword.length < 4) {
-    setPasswordMsg("❌ Password minimal 4 karakter.");
-    return;
-  }
-  setSavingPassword(true);
-  setPasswordMsg("");
-  try {
-    const res = await fetch("http://localhost:5000/change_password", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({
-        username,
-        current_password: currentPassword,
-        new_password: newPassword,
-      }),
-    });
-    const data = await res.json();
-    if (!data.success) {
-      setPasswordMsg("❌ " + data.message);
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      showToast("Semua field password harus diisi.", "error");
       return;
     }
-    setPasswordMsg("✅ Password berhasil diubah!");
-    setCurrentPassword("");
-    setNewPassword("");
-    setConfirmPassword("");
-  } catch {
-    setPasswordMsg("❌ Gagal terhubung ke server.");
-  } finally {
-    setSavingPassword(false);
+    if (newPassword !== confirmPassword) {
+      showToast("Password baru tidak cocok.", "error");
+      return;
+    }
+    if (newPassword.length < 4) {
+      showToast("Password minimal 4 karakter.", "error");
+      return;
+    }
+    setSavingPassword(true);
+    try {
+      const res = await fetch("http://localhost:5000/change_password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          username,
+          current_password: currentPassword,
+          new_password: newPassword,
+        }),
+      });
+      const data = await res.json();
+      if (!data.success) {
+        showToast(data.message, "error");
+        return;
+      }
+      showToast("Password berhasil diubah!", "success");
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch {
+      showToast("Gagal terhubung ke server.", "error");
+    } finally {
+      setSavingPassword(false);
+    }
   }
-}
 
   function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = async () => {
-    const result = reader.result as string;
-    setAvatar(result);
-    setAvatarError(false);
-    sessionStorage.setItem("ventara_avatar", result);
-
-    const currentUsername = sessionStorage.getItem("ventara_username") || username; // ← fix
-    await fetch("http://localhost:5000/update_profile", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
-      body: JSON.stringify({ username: currentUsername, avatar: result }),
-    });
-  };
-  reader.readAsDataURL(file);
-}
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setAvatar(result);        // preview langsung
+      setAvatarError(false);
+      setAvatarFile(result);    // ✅ simpan ke state, belum kirim ke server
+    };
+    reader.readAsDataURL(file);
+  }
 
   const displayAvatar = avatarError || !avatar ? DEFAULT_AVATAR : avatar;
 
@@ -131,19 +142,30 @@ export default function EditProfilePage() {
 
         <div className="p-8">
           <div className="max-w-5xl mx-auto">
-
             {/* BACK BUTTON */}
             <button
               onClick={() => router.push("/settings")}
               className="flex items-center gap-2 text-md italic text-gray-500 hover:text-gray-900 mb-6 transition-colors cursor-pointer"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              <svg
+                className="w-5 h-5"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
               </svg>
               Kembali ke Settings
             </button>
 
-            <h2 className="text-2xl font-bold text-gray-900 mb-8">Edit Profile</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 ml-8">
+              Edit Profile
+            </h2>
 
             {/* AVATAR */}
             <div className="flex items-center gap-10 mb-8 max-w-4xl px-14 py-5 ml-12 bg-white border border-gray-100 rounded-xl">
@@ -158,10 +180,20 @@ export default function EditProfilePage() {
                   onError={() => setAvatarError(true)}
                 />
               </div>
-              <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleAvatarChange} />
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                hidden
+                onChange={handleAvatarChange}
+              />
               <div>
-                <p className="text-sm font-medium text-gray-700 mb-1">Foto Profil</p>
-                <p className="text-xs text-gray-400">Klik foto untuk mengganti foto profil pengguna</p>
+                <p className="text-sm font-medium text-gray-700 mb-1">
+                  Foto Profil
+                </p>
+                <p className="text-xs text-gray-400">
+                  Klik foto untuk mengganti foto profil pengguna
+                </p>
               </div>
               <div className="ml-63">
                 <button
@@ -175,12 +207,13 @@ export default function EditProfilePage() {
 
             {/* FORM */}
             <div className="bg-white border border-gray-100 rounded-xl divide-y divide-gray-100 max-w-4xl ml-12">
-
               {/* Nama */}
               <div className="flex items-center justify-between py-4 px-12">
                 <div>
                   <p className="text-sm text-gray-700">Nama</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Nama yang ditampilkan di aplikasi</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Nama yang ditampilkan di aplikasi
+                  </p>
                 </div>
                 <input
                   type="text"
@@ -194,7 +227,9 @@ export default function EditProfilePage() {
               <div className="flex items-center justify-between py-4 px-12">
                 <div>
                   <p className="text-sm text-gray-700">Email</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Email akun Anda</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Email akun Anda
+                  </p>
                 </div>
                 <input
                   type="email"
@@ -208,62 +243,197 @@ export default function EditProfilePage() {
               <div className="flex items-center justify-between py-4 px-12">
                 <div>
                   <p className="text-sm text-gray-700">Username</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Username tidak dapat diubah</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Username tidak dapat diubah
+                  </p>
                 </div>
-                <span className="text-sm text-gray-400 bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-100">{username || "-"}</span>
+                <span className="text-sm text-gray-400 bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-100 cursor-not-allowed">
+                  {username || "-"}
+                </span>
               </div>
             </div>
 
             {/* PASSWORD */}
             <div className="bg-white border border-gray-100 rounded-xl divide-y divide-gray-100 max-w-4xl ml-12 mt-6">
-              <div className="px-12 py-4">
-                <p className="text-sm font-medium text-gray-700 mb-4">Ubah Password</p>
+              <div className="px-12 py-2">
+                <p className="text-md font-bold text-gray-700 my-2">
+                  Change Password
+                </p>
               </div>
 
               <div className="flex items-center justify-between py-4 px-12">
                 <div>
                   <p className="text-sm text-gray-700">Password Saat Ini</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Masukkan password yang sekarang</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Masukkan password yang sekarang
+                  </p>
                 </div>
-                <input
-                  type="password"
-                  value={currentPassword}
-                  onChange={(e) => setCurrentPassword(e.target.value)}
-                  className="text-sm px-3 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 text-gray-700 w-52"
-                />
+                <div className="relative w-52">
+                  <input
+                    type={showCurrentPw ? "text" : "password"}
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="text-sm px-3 py-1.5 pr-9 rounded-lg border border-gray-200 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 text-gray-700 w-full"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPw(!showCurrentPw)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showCurrentPw ? (
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center justify-between py-4 px-12">
                 <div>
                   <p className="text-sm text-gray-700">Password Baru</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Minimal 4 karakter</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Minimal 4 karakter
+                  </p>
                 </div>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="text-sm px-3 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 text-gray-700 w-52"
-                />
+                <div className="relative w-52">
+                  <input
+                    type={showNewPw ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="text-sm px-3 py-1.5 pr-9 rounded-lg border border-gray-200 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 text-gray-700 w-full"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPw(!showNewPw)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showNewPw ? (
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
 
               <div className="flex items-center justify-between py-4 px-12">
                 <div>
                   <p className="text-sm text-gray-700">Konfirmasi Password</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Ulangi password baru</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    Ulangi password baru
+                  </p>
                 </div>
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="text-sm px-3 py-1.5 rounded-lg border border-gray-200 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 text-gray-700 w-52"
-                />
+                <div className="relative w-52">
+                  <input
+                    type={showConfirmPw ? "text" : "password"}
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="text-sm px-3 py-1.5 pr-9 rounded-lg border border-gray-200 focus:outline-none focus:border-teal-400 focus:ring-2 focus:ring-teal-500/20 text-gray-700 w-full"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPw(!showConfirmPw)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  >
+                    {showConfirmPw ? (
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21"
+                        />
+                      </svg>
+                    ) : (
+                      <svg
+                        className="w-4 h-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                        />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
-
-              {passwordMsg && (
-                <div className="px-12 py-3">
-                  <p className="text-sm">{passwordMsg}</p>
-                </div>
-              )}
 
               <div className="flex justify-end px-12 py-4">
                 <button
@@ -275,13 +445,6 @@ export default function EditProfilePage() {
                 </button>
               </div>
             </div>
-
-            {/* Save message */}
-            {saveMsg && (
-              <div className="mt-4 px-4 py-2">
-                <p className="text-sm">{saveMsg}</p>
-              </div>
-            )}
 
             {/* ACTION BUTTONS */}
             <div className="flex justify-end gap-3 mt-8 mr-24">
@@ -301,6 +464,47 @@ export default function EditProfilePage() {
             </div>
           </div>
         </div>
+
+        {toast && (
+          <div
+            className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-xl shadow-lg text-sm font-medium ${
+              toast.type === "success"
+                ? "bg-teal-600 text-white"
+                : "bg-red-500 text-white"
+            }`}
+          >
+            {toast.type === "success" ? (
+              <svg
+                className="w-4 h-4 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
+              </svg>
+            ) : (
+              <svg
+                className="w-4 h-4 shrink-0"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            )}
+            {toast.msg}
+          </div>
+        )}
       </main>
     </div>
   );

@@ -54,13 +54,16 @@ export default function HistorisPage() {
   const {storageInfo, refreshStorage } = useStorage();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const [selectedTier, setSelectedTier] =
-  useState<"basic" | "pro" | "business">("basic");
+  useState<"basic" | "business">("basic");
 
   useEffect(() => {
-    async function fetchHistory() {
+    async function init() {
       try {
         const username = sessionStorage.getItem("ventara_username") || "";
-        const res = await fetch(`/api/get-history?username=${username}`);
+        const [res] = await Promise.all([
+          fetch(`/api/get-history?username=${username}`),
+          refreshStorage(),
+        ]);
         const json = await res.json();
         setData(Array.isArray(json) ? json : []);
       } catch (error) {
@@ -68,7 +71,7 @@ export default function HistorisPage() {
       }
     }
 
-    fetchHistory();
+    init();
   }, []);
 
   // ganti DUMMY_DATA jadi data
@@ -177,7 +180,7 @@ export default function HistorisPage() {
               </div>
               <button
                 onClick={() => setShowUpgradeModal(true)}
-                className="text-sm text-teal-600 font-medium hover:text-teal-700 whitespace-nowrap border border-teal-200 px-4 py-2 rounded-xl hover:bg-teal-50 transition"
+                className="text-sm text-teal-600 font-medium hover:text-teal-700 whitespace-nowrap border border-teal-200 px-4 py-2 rounded-xl hover:bg-teal-50 cursor-pointer transition"
               >
                 Upgrade (Gratis)
               </button>
@@ -293,7 +296,7 @@ export default function HistorisPage() {
                                 );
                                 window.location.href = "/overview";
                               }}
-                              className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-colors"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-colors cursor-pointer"
                               title="Lihat detail"
                             >
                               <svg
@@ -317,7 +320,7 @@ export default function HistorisPage() {
                               </svg>
                             </button>
                             <button
-                              className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-teal-600 hover:bg-teal-50 hover:border-teal-200 transition-colors"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-teal-600 hover:bg-teal-50 hover:border-teal-200 transition-colors cursor-pointer"
                               title="Unduh CSV"
                             >
                               <svg
@@ -336,7 +339,7 @@ export default function HistorisPage() {
                             </button>
                             <button
                               onClick={() => setDeleteConfirmId(row.id)}
-                              className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors"
+                              className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors cursor-pointer"
                               title="Hapus"
                             >
                               <svg
@@ -419,7 +422,7 @@ export default function HistorisPage() {
               <div className="flex gap-3 justify-end">
                 <button
                   onClick={() => setDeleteConfirmId(null)}
-                  className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors"
+                  className="px-4 py-2 text-sm rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
@@ -429,11 +432,11 @@ export default function HistorisPage() {
                     setDeleteConfirmId(null);
                   }}
                   disabled={deletingId === deleteConfirmId}
-                  className="px-4 py-2 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors disabled:opacity-50"
+                  className="px-4 py-2 text-sm rounded-lg bg-red-500 text-white hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
                 >
                   {deletingId === deleteConfirmId
                     ? "Menghapus..."
-                    : "Ya, Hapus"}
+                    : "Hapus"}
                 </button>
               </div>
             </div>
@@ -450,7 +453,7 @@ export default function HistorisPage() {
                 </h3>
                 <button
                   onClick={() => setShowUpgradeModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-gray-400 hover:text-gray-600 cursor-pointer"
                 >
                   ✕
                 </button>
@@ -468,24 +471,18 @@ export default function HistorisPage() {
                     key: "basic",
                     label: "Basic",
                     mb: "100.00 MB",
-                    price: "Rp 29.000 / bulan",
-                  },
-                  {
-                    key: "pro",
-                    label: "Pro",
-                    mb: "500.00 MB",
-                    price: "Rp 99.000 / bulan",
+                    price: "Rp 199.000 / bulan",
                   },
                   {
                     key: "business",
                     label: "Business",
                     mb: "2048.00 MB",
-                    price: "Rp 299.000 / bulan",
+                    price: "Rp 599.000 / bulan",
                   },
                 ].map((tier) => (
                   <div
                     key={tier.key}
-                    onClick={() => setSelectedTier(tier.key as "basic" | "pro" | "business")}
+                    onClick={() => setSelectedTier(tier.key as "basic" | "business")}
                     className={`cursor-pointer border-2 rounded-xl p-4 transition ${
                       selectedTier === tier.key
                         ? "border-teal-400 bg-teal-50"
@@ -526,14 +523,13 @@ export default function HistorisPage() {
 
                   setShowUpgradeModal(false);
                 }}
-                className="w-full py-3 bg-teal-500 text-white font-medium rounded-xl hover:bg-teal-600 transition capitalize"
+                className="w-full py-3 bg-teal-600 text-white font-medium rounded-xl hover:bg-teal-700 transition capitalize cursor-pointer"
               >
                 Upgrade ke {selectedTier} —{" "}
                 {
                   {
-                    basic: "Rp 29.000",
-                    pro: "Rp 99.000",
-                    business: "Rp 299.000",
+                    basic: "Rp 199.000",
+                    business: "Rp 599.000",
                   }[selectedTier]
                 }
                 /bulan

@@ -138,7 +138,9 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
         const data = await fetchTrainProgress();
 
         if (data.running) {
-          poll(() => window.location.reload());
+          poll(() => {
+            window.location.reload();  // tetap reload kalau resume dari tab lain
+          });
         }
       } catch (err) {
         console.error(err);

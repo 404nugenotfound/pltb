@@ -1,6 +1,5 @@
 "use client";
-
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 interface ModelMetrics {
   MAE: number;
@@ -23,21 +22,23 @@ export function useMetrics() {
   });
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const username = sessionStorage.getItem("ventara_username") || "";
-        const res = await fetch(`/api/forecasting-data?username=${username}`);
-        const json = await res.json();
-        setData(json);
-      } catch (e) {
-        console.error("Failed to fetch metrics:", e);
-      } finally {
-        setLoading(false);
-      }
+  const fetchData = useCallback(async () => {
+    try {
+      const username = sessionStorage.getItem("ventara_username") || "";
+      const res = await fetch(`/api/forecasting-data?username=${username}`);
+      const json = await res.json();
+      setData(json);
+    } catch (e) {
+      console.error("Failed to fetch metrics:", e);
+    } finally {
+      setLoading(false);
     }
-    fetchData();
   }, []);
 
-  return { ...data, loading };
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // ✅ expose refreshMetrics
+  return { ...data, loading, refreshMetrics: fetchData };
 }

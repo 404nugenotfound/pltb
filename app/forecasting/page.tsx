@@ -19,7 +19,7 @@ import { useGenerateContext } from "@/app/context/GenerateContext";
 export default function ForecastingPage() {
   const [ selectedModel, setSelectedModel] = useState("all");
 
-  const { dataset_name, metrics, best_models, loading } = useMetrics();
+  const { dataset_name, metrics, best_models, loading, refreshMetrics } = useMetrics();
 
   const [ generateMode, setGenerateMode] = useState<"general" | "best">("general");
 
@@ -119,6 +119,7 @@ export default function ForecastingPage() {
                 sessionStorage.removeItem(`ventara_ui_state_${username}`);
                 sessionStorage.removeItem(`ventara_nlp_report_${username}`);
               }}
+              onTrainingComplete={refreshMetrics}  // ✅ refresh metrics setelah training selesai
               />
             </div>
 

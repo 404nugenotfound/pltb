@@ -13,15 +13,17 @@ interface UploadStateProps {
   datasetName: string;
   nlpReport: string;
   generateMode?: "general" | "best";
-  onUiStateChange: (state: "idle" | "loading" | "nlp") => void; // ← tambah
+  onUiStateChange: (state: "idle" | "loading" | "nlp") => void;
   onReset?: () => void;
+  onTrainingComplete?: () => void;  
 }
 
 export default function UploadState({
   uiState,
   datasetName,
   nlpReport,
-  generateMode,  // ← tambah ini
+  generateMode,
+  onTrainingComplete, 
   onUiStateChange,
   onReset
 }: UploadStateProps) {
@@ -33,7 +35,9 @@ export default function UploadState({
     handleFiles(
       files,
       // onTrainingStarted — status "started"
-      () => train.startTrainToast(() => window.location.reload()),
+      () => train.startTrainToast(() => {
+        onTrainingComplete?.();  // ✅ refresh metrics
+      }),
       // onReload — status "skipped"
       () => window.location.reload()
     );
