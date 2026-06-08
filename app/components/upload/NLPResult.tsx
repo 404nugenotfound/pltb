@@ -37,7 +37,7 @@ export default function NLPResult({
             AI Forecast Summary
           </h3>
 
-          <p className="text-sm text-gray-700 leading-relaxed text-justify">
+          <p className="text-sm text-gray-700 leading-relaxed text-justify white">
             {nlpReport}
           </p>
 

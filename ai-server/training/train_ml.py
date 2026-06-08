@@ -3,6 +3,7 @@ import numpy as np
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.neighbors import KNeighborsRegressor
+from sklearn.model_selection import cross_val_score
 import xgboost as xgb_lib
 from config import MODEL_FOLDER
 
@@ -21,7 +22,13 @@ def train_ml_models(X, y, features, suffix=""):
         n_iter_no_change=10,  # ✅ early stopping GBR
         tol=1e-4
     )
-    gbr.fit(X, y)
+    
+    split_train = int(len(X) * 0.8)
+    split_val   = int(len(X) * 0.9)
+    X_train, X_val = X[:split_train], X[split_train:split_val]
+    y_train, y_val = y[:split_train], y[split_train:split_val]
+
+    gbr.fit(X_train, y_train)  # ← ganti dari X, y
     joblib.dump(gbr, f"{MODEL_FOLDER}/gbr{suffix}.pkl")
 
     # =========================
@@ -41,9 +48,11 @@ def train_ml_models(X, y, features, suffix=""):
     )
 
     # ✅ XGB butuh eval_set untuk early stopping
-    split   = int(len(X) * 0.9)
-    X_train, X_val = X[:split], X[split:]
-    y_train, y_val = y[:split], y[split:]
+    split_train = int(len(X) * 0.8)
+    split_val   = int(len(X) * 0.9)
+    
+    X_train, X_val = X[:split_train], X[split_train:split_val]
+    y_train, y_val = y[:split_train], y[split_train:split_val]
 
     xgb.fit(
         X_train, y_train,
@@ -53,21 +62,52 @@ def train_ml_models(X, y, features, suffix=""):
     joblib.dump(xgb, f"{MODEL_FOLDER}/xgb{suffix}.pkl")
 
     # =========================
-    # KNN
-    # ✅ n_neighbors naik 5→7 — lebih robust untuk data cuaca
-    # ✅ algorithm='ball_tree' — lebih cepat untuk data besar
+    # KNN — auto-tune n_neighbors
     # =========================
+    from sklearn.model_selection import cross_val_score
+
     scaler = MinMaxScaler()
-    X_knn  = scaler.fit_transform(X)
-    knn    = KNeighborsRegressor(
-        n_neighbors=7,
+    X_knn_train = scaler.fit_transform(X_train)
+
+    best_k     = 7
+    best_score = -np.inf
+
+    for k in [15, 21, 27, 33, 41]:  # ← jauh lebih besar dari default 5, karena data lebih besar dan lebih kompleks
+        try:
+            knn_candidate = KNeighborsRegressor(
+                n_neighbors=k,
+                metric="euclidean", 
+                algorithm="ball_tree",
+                n_jobs=-1
+            )
+            scores = cross_val_score(
+                knn_candidate, X_knn_train, y_train,
+                cv=3, scoring="r2", n_jobs=-1
+            )
+            mean_score = scores.mean()
+            print(f"  KNN k={k} → R2={mean_score:.4f}")
+            if mean_score > best_score:
+                best_score = mean_score
+                best_k     = k
+        except Exception as e:
+            print(f"  KNN k={k} gagal: {e}")
+
+    if best_score == -np.inf:
+        best_k = 7
+        print(f"⚠️ Cross-val gagal, pakai default k=7")
+
+    print(f"✅ KNN best k={best_k}")
+
+    knn = KNeighborsRegressor(
+        n_neighbors=best_k,
         metric="euclidean",
-        algorithm="ball_tree",  # ✅ lebih cepat dari brute force
-        n_jobs=-1               # ✅ pakai semua core CPU
+        algorithm="ball_tree",
+        weights="uniform",
+        n_jobs=-1
     )
-    knn.fit(X_knn, y)
-    joblib.dump(knn,    f"{MODEL_FOLDER}/knn{suffix}.pkl")
-    joblib.dump(scaler, f"{MODEL_FOLDER}/scaler{suffix}.pkl")
+    knn.fit(X_knn_train, y_train)
+    joblib.dump(knn,      f"{MODEL_FOLDER}/knn{suffix}.pkl")
+    joblib.dump(scaler,   f"{MODEL_FOLDER}/scaler{suffix}.pkl")
     joblib.dump(features, f"{MODEL_FOLDER}/features{suffix}.pkl")
 
     return gbr, xgb, knn, scaler

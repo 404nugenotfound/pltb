@@ -105,9 +105,10 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
             setTraining(doneState);
 
             setTimeout(async () => {
-              await clearTrainProgress();
+              try { await clearTrainProgress(); } catch {}
               stopTraining();
               onComplete?.();
+              window.dispatchEvent(new Event("training-complete"));
             }, 2000);
           }
           return;
@@ -139,7 +140,7 @@ export function TrainingProvider({ children }: { children: React.ReactNode }) {
 
         if (data.running) {
           poll(() => {
-            window.location.reload();  // tetap reload kalau resume dari tab lain
+            window.dispatchEvent(new Event("training-complete"));  // tetap reload kalau resume dari tab lain
           });
         }
       } catch (err) {

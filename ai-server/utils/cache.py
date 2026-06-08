@@ -4,6 +4,16 @@ from config import MODEL_FOLDER
 from utils.dataset import get_active_dataset_path
 from training.metrics import compute_metrics_fresh
 
+def _flatten_to_test(metrics_dict: dict) -> dict:
+    """Ambil test metrics saja dari format train/test."""
+    result = {}
+    for model, val in metrics_dict.items():
+        if isinstance(val, dict) and "test" in val:
+            result[model] = val["test"]
+        else:
+            result[model] = val  # fallback format lama
+    return result
+
 def get_metrics_cache_path(dataset_path: str = ""):
     if not dataset_path:
         dataset_path = get_active_dataset_path()
@@ -65,7 +75,9 @@ def load_or_compute_metrics(
                     with open(cache_path, "w") as f:
                         json.dump(cache, f, indent=2)
                 else:
-                    return var_cache["ml"], var_cache.get("dl", {})
+                    ml_raw = var_cache["ml"]
+                    dl_raw = var_cache.get("dl", {})
+                    return _flatten_to_test(ml_raw), _flatten_to_test(dl_raw)
 
             # Fallback: format lama flat (ml/dl langsung)
             elif "ml" in cache:
@@ -74,7 +86,7 @@ def load_or_compute_metrics(
                     print("🔄 Cache tidak ada DL metrics, hitung ulang...")
                     os.remove(cache_path)
                 else:
-                    return cache["ml"], cache.get("dl", {})
+                   return _flatten_to_test(cache["ml"]), _flatten_to_test(cache.get("dl", {}))
 
         except Exception as e:
             print(f"❌ Cache rusak: {e}")
@@ -109,3 +121,5 @@ def load_or_compute_metrics(
 
     print(f"✅ Cache [{var_name}] disimpan: {os.path.basename(cache_path)}")
     return ml, dl
+
+

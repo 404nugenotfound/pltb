@@ -12,18 +12,19 @@ def get_metrics(y_true, y_pred):
     yt = np.array(y_true).flatten()
     yp = np.array(y_pred).flatten()
 
-    # ✅ Filter y_true == 0 biar tidak inf/nan di MAPE
-    mask = yt != 0
+    # ✅ sMAPE — lebih stabil dari MAPE waktu nilai aktual kecil
+    denom = (np.abs(yt) + np.abs(yp)) / 2
+    mask = denom != 0
     if mask.sum() > 0:
-        mape = round(float(np.mean(np.abs((yt[mask] - yp[mask]) / yt[mask])) * 100), 2)
+        smape = round(float(np.mean(np.abs(yt[mask] - yp[mask]) / denom[mask]) * 100), 2)
     else:
-        mape = float("nan")
+        smape = float("nan")
 
     return {
-        "MAE":  round(float(mean_absolute_error(yt, yp)), 3),
-        "RMSE": round(float(np.sqrt(mean_squared_error(yt, yp))), 3),
-        "MAPE": mape,
-        "R2":   round(float(r2_score(yt, yp)), 3)
+        "MAE":   round(float(mean_absolute_error(yt, yp)), 3),
+        "RMSE":  round(float(np.sqrt(mean_squared_error(yt, yp))), 3),
+        "sMAPE": smape,
+        "R2":    round(float(r2_score(yt, yp)), 3)
     }
 
 def save_metrics(ml, dl, var_name: str = "WS10M"):
@@ -62,14 +63,31 @@ def load_metrics(var_name: str = "WS10M"):
     return None, None
 
 def load_metrics_for_var(var_name: str):
-    """Alias eksplisit untuk dipakai di worker generate."""
+    """Load metrics untuk forecasting — ambil test metrics saja."""
     ml, _ = load_metrics(var_name)
-    return ml or {}
+    if not ml:
+        return {}
+    # ← flatten: ambil test metrics untuk ditampilkan di dashboard
+    result = {}
+    for model, val in ml.items():
+        if isinstance(val, dict) and "test" in val:
+            result[model] = val["test"]
+        else:
+            result[model] = val  # fallback format lama
+    return result
 
 def load_dl_metrics_for_var(var_name: str):
-    """Alias eksplisit untuk dipakai di worker generate."""
+    """Load DL metrics untuk forecasting — ambil test metrics saja."""
     _, dl = load_metrics(var_name)
-    return dl or {}
+    if not dl:
+        return {}
+    result = {}
+    for model, val in dl.items():
+        if isinstance(val, dict) and "test" in val:
+            result[model] = val["test"]
+        else:
+            result[model] = val
+    return result
 
 def compute_metrics_fresh(
     ML_READY, DL_READY,
@@ -80,25 +98,41 @@ def compute_metrics_fresh(
     if not ML_READY:
         return {}, {}
     
+    # ← tambah split 90/10
+    split_train = int(len(X) * 0.8)
+    split_val   = int(len(X) * 0.9)
+
+    X_train = X[:split_train]
+    X_test  = X[split_val:]   # ← 10% terakhir, tidak tersentuh training
+    y_train = y[:split_train]
+    y_test  = y[split_val:]
+    
     ml = {}
     if gbr is not None:
-        ml["GBR"] = get_metrics(y, gbr.predict(X))
+        ml["GBR"] = {"train": get_metrics(y_train, gbr.predict(X_train)), "test": get_metrics(y_test, gbr.predict(X_test))}
     if xgb is not None:
-        ml["XGB"] = get_metrics(y, xgb.predict(X))
+        ml["XGB"] = {"train": get_metrics(y_train, xgb.predict(X_train)), "test": get_metrics(y_test, xgb.predict(X_test))}
     if knn is not None and scaler is not None:
-        ml["KNN"] = get_metrics(y, knn.predict(scaler.transform(X)))
+        ml["KNN"] = {"train": get_metrics(y_train, knn.predict(scaler.transform(X_train))), "test": get_metrics(y_test, knn.predict(scaler.transform(X_test)))}
     
     dl = {}
     if DL_READY and X_scaled is not None:
-        seqs = np.array([
-            X_scaled[i-STEP:i]
-            for i in range(STEP, len(X_scaled))
-        ])
-        y_dl          = y[STEP:].reshape(-1, 1)
-        y_pred_lstm   = scaler_y.inverse_transform(lstm.predict(seqs,   verbose=0))
-        y_pred_bilstm = scaler_y.inverse_transform(bilstm.predict(seqs, verbose=0))
-        dl["LSTM"]   = get_metrics(y_dl, y_pred_lstm)
-        dl["BiLSTM"] = get_metrics(y_dl, y_pred_bilstm)
+        split_train_dl = int(len(X_scaled) * 0.8)
+        split_val_dl   = int(len(X_scaled) * 0.9)
 
+        seqs_train = np.array([X_scaled[i-STEP:i] for i in range(STEP, split_train_dl)])
+        y_dl_train = y[STEP:split_train_dl].reshape(-1, 1)
+
+        seqs_test  = np.array([X_scaled[i-STEP:i] for i in range(split_val_dl, len(X_scaled))])
+        y_dl_test  = y[split_val_dl:].reshape(-1, 1)
+
+        for name, model in [("LSTM", lstm), ("BiLSTM", bilstm)]:
+            pred_train = scaler_y.inverse_transform(model.predict(seqs_train, verbose=0))
+            pred_test  = scaler_y.inverse_transform(model.predict(seqs_test,  verbose=0))
+            dl[name] = {
+                "train": get_metrics(y_dl_train, pred_train),
+                "test":  get_metrics(y_dl_test,  pred_test)
+            }
+            
     save_metrics(ml, dl, var_name)   # ✅ pakai var_name
     return ml, dl

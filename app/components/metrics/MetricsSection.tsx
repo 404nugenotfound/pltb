@@ -3,7 +3,7 @@
 interface MetricItem {
   MAE: number;
   RMSE: number;
-  MAPE: number;
+  sMAPE: number;
   R2: number;
 }
 
@@ -70,8 +70,8 @@ export default function MetricsSection({
                 </div>
 
                 <div className="flex justify-between">
-                  <span>MAPE</span>
-                  <span className="font-semibold text-gray-800">{m.MAPE}%</span>
+                  <span>sMAPE</span>
+                  <span className="font-semibold text-gray-800">{m.sMAPE}%</span>
                 </div>
 
                 <div className="flex justify-between">
@@ -128,8 +128,8 @@ export default function MetricsSection({
                 </div>
 
                 <div className="flex justify-between">
-                  <span>MAPE</span>
-                  <span className="font-semibold text-gray-800">{m.MAPE}%</span>
+                  <span>sMAPE</span>
+                  <span className="font-semibold text-gray-800">{m.sMAPE}%</span>
                 </div>
 
                 <div className="flex justify-between">

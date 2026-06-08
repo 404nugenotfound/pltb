@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 interface ModelMetrics {
   MAE: number;
   RMSE: number;
-  MAPE: number;
+  sMAPE: number;
   R2: number;
 }
 
@@ -27,6 +27,7 @@ export function useMetrics() {
       const username = sessionStorage.getItem("ventara_username") || "";
       const res = await fetch(`/api/forecasting-data?username=${username}`);
       const json = await res.json();
+         // ✅ guard — jangan setData kalau response error
       setData(json);
     } catch (e) {
       console.error("Failed to fetch metrics:", e);
@@ -38,6 +39,12 @@ export function useMetrics() {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  useEffect(() => {
+  const handler = () => fetchData();
+  window.addEventListener("training-complete", handler);
+  return () => window.removeEventListener("training-complete", handler);
+}, [fetchData]);
 
   // ✅ expose refreshMetrics
   return { ...data, loading, refreshMetrics: fetchData };

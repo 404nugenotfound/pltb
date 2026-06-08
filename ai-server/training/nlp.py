@@ -50,10 +50,10 @@ def _get_label(var: str):
 def get_best_ml_and_dl(m_ml: dict, m_dl: dict) -> list:
     if not m_ml:
         return []
-    best_ml = min(m_ml, key=lambda m: m_ml[m]["MAPE"])
+    best_ml = min(m_ml, key=lambda m: m_ml[m]["sMAPE"])
     result  = [best_ml]
     if m_dl:
-        best_dl = min(m_dl, key=lambda m: m_dl[m]["MAPE"])
+        best_dl = min(m_dl, key=lambda m: m_dl[m]["sMAPE"])
         result.append(best_dl)
     return result
 
@@ -101,42 +101,90 @@ def build_forecast_text(df_future: pd.DataFrame, var: str) -> dict:
 
 def generate_nlp_report(stats: dict, best_model_name: str, best_met: dict) -> str:
     """NLP report untuk satu variabel — dipakai di Generate General."""
-    mape_raw = str(best_met.get("MAPE", "-")).replace(",", ".").replace("%", "").strip()
-    rmse_raw = str(best_met.get("RMSE", "-")).replace(",", ".").strip()
+    smape_raw = str(best_met.get("sMAPE", "-")).replace(",", ".").replace("%", "").strip()
+    rmse_raw  = str(best_met.get("RMSE", "-")).replace(",", ".").strip()
+    mae_raw   = str(best_met.get("MAE",  "-")).replace(",", ".").strip()
+    r2_raw    = str(best_met.get("R2",   "-")).replace(",", ".").strip()
 
-    if mape_raw.lower() in ("-", "", "nan", "none"):
-        mape_str = "N/A"
-        akurasi  = "tidak tersedia"
+    if smape_raw.lower() in ("-", "", "nan", "none"):
+        smape_str = "N/A"
+        akurasi   = "tidak tersedia"
     else:
-        mape     = float(mape_raw)
-        mape_str = f"{mape:.2f}%"
-        akurasi  = "tinggi" if mape < 10 else "cukup" if mape < 20 else "rendah"
+        smape     = float(smape_raw)
+        smape_str = f"{smape:.2f}%"
+        akurasi   = "tinggi" if smape < 10 else "cukup" if smape < 20 else "rendah"
 
     rmse_str = "N/A" if rmse_raw.lower() in ("-", "", "nan", "none") else rmse_raw
-    nama     = stats.get("nama",   "nilai")
-    satuan   = stats.get("satuan", "")
+    mae_str  = "N/A" if mae_raw.lower()  in ("-", "", "nan", "none") else mae_raw
+    r2_str   = "N/A" if r2_raw.lower()   in ("-", "", "nan", "none") else r2_raw
+
+    nama   = stats.get("nama",   "nilai")
+    satuan = stats.get("satuan", "")
+    avg    = stats["avg"]
+
+    # Interpretasi kontekstual
+    if nama == "kecepatan angin":
+        if avg < 1.5:
+            konteks = "Kondisi ini kurang ideal untuk operasional PLTB karena berada di bawah cut-in speed turbin."
+        elif avg < 3.3:
+            konteks = "Kecepatan angin rendah, hanya cocok untuk turbin skala kecil dengan efisiensi terbatas."
+        elif avg < 5.5:
+            konteks = "Kecepatan angin sedang, cukup untuk turbin skala menengah dengan efisiensi memadai."
+        elif avg < 8.0:
+            konteks = "Kecepatan angin segar, mendukung operasional PLTB dengan potensi produksi energi yang baik."
+        else:
+            konteks = "Kecepatan angin kencang, sangat mendukung produksi energi optimal pada PLTB."
+    elif nama == "kelembaban udara":
+        if avg < 70:
+            konteks = "Kelembaban udara dalam kisaran aman dan tidak memberikan dampak signifikan terhadap operasional turbin."
+        else:
+            konteks = "Kelembaban tinggi perlu diperhatikan karena berpotensi mempercepat korosi pada komponen turbin."
+    elif nama == "arah angin":
+        konteks = (
+            f"Arah angin dominan {stats['category']} ({avg:.1f}°), "
+            f"penting untuk kalibrasi yaw control dan optimasi layout PLTB."
+        )
+    else:
+        konteks = f"Nilai {nama} berada pada kisaran normal untuk wilayah pengamatan."
+
+    # Interpretasi R2
+    try:
+        r2 = float(r2_raw)
+        r2_interp = (
+            "sangat baik" if r2 >= 0.95 else
+            "baik" if r2 >= 0.85 else
+            "cukup"
+        )
+    except:
+        r2_interp = "tidak tersedia"
 
     return (
-        f"Prediksi {nama} untuk periode "
-        f"{stats['start_date']} hingga {stats['end_date']} "
-        f"menunjukkan rata-rata {stats['avg']:.2f} {satuan}, "
-        f"termasuk kategori {stats['category']}. "
-        f"Nilai tertinggi mencapai {stats['max_val']:.2f} {satuan} "
-        f"dan terendah {stats['min_val']:.2f} {satuan}, "
-        f"dengan standar deviasi {stats['std_val']:.2f} {satuan}. "
-        f"Nilai cenderung paling tinggi sekitar pukul {stats['peak_hr']:02d}:00 "
-        f"dan paling rendah sekitar pukul {stats['low_hr']:02d}:00. "
-        f"Secara umum tren {nama} {stats['trend']}. "
-        f"\n\nModel terbaik adalah {best_model_name} "
-        f"dengan MAPE {mape_str} dan RMSE {rmse_str}. "
-        f"Tingkat akurasi model tergolong {akurasi}."
+        f"Ringkasan prediksi {nama} untuk periode "
+        f"{stats['start_date']} hingga {stats['end_date']}:\n"
+        f"\n"
+        f"▸ Statistik: rata-rata {stats['avg']:.2f} {satuan} ({stats['category']}), "
+        f"tertinggi {stats['max_val']:.2f} {satuan}, terendah {stats['min_val']:.2f} {satuan}, "
+        f"standar deviasi {stats['std_val']:.2f} {satuan}. "
+        f"Rentang nilai harian mencapai {stats['max_val'] - stats['min_val']:.2f} {satuan}.\n"
+        f"\n"
+        f"▸ Pola harian: puncak sekitar pukul {stats['peak_hr']:02d}:00, "
+        f"lembah sekitar pukul {stats['low_hr']:02d}:00. "
+        f"Tren {stats['trend']}.\n"
+        f"\n"
+        f"▸ Analisis: {konteks} "
+        f"Pemantauan berkala tetap disarankan untuk mengantisipasi perubahan kondisi atmosfer "
+        f"yang dapat mempengaruhi kinerja sistem.\n"
+        f"\n"
+        f"▸ Performa model: {best_model_name} — "
+        f"MAE {mae_str} {satuan}, RMSE {rmse_str} {satuan}, sMAPE {smape_str}, R² {r2_str} ({r2_interp}). "
+        f"Model mampu menjelaskan variasi data dengan kemampuan {r2_interp}. "
+        f"Akurasi keseluruhan tergolong {akurasi}."
     )
-
 
 def generate_nlp_report_best(
     stats_per_var: dict,   # {"WS10M": stats_dict, "RH2M": stats_dict, "WD10M": stats_dict}
-    best_per_var:  dict,   # {"WS10M": ("GBR", {"MAPE":..,"RMSE":..}), ...}
-) -> str:
+    best_per_var:  dict,   # {"WS10M": ("GBR", {"sMAPE":..,"RMSE":..}), ...}
+) -> str:   
     """
     ✅ NLP report untuk Generate Best — merangkum ketiga variabel sekaligus.
     stats_per_var : hasil build_forecast_text per variabel
@@ -159,17 +207,17 @@ def generate_nlp_report_best(
 
         best_name, best_met = best_per_var.get(var, ("N/A", {}))
 
-        mape_raw = str(best_met.get("MAPE", "-")).replace(",", ".").replace("%", "").strip()
+        smape_raw = str(best_met.get("sMAPE", "-")).replace(",", ".").replace("%", "").strip()
         rmse_raw = str(best_met.get("RMSE", "-")).replace(",", ".").strip()
 
-        if mape_raw.lower() in ("-", "", "nan", "none"):
-            mape_str = "N/A"
+        if smape_raw.lower() in ("-", "", "nan", "none"):
+            smape_str = "N/A"
             akurasi  = "tidak tersedia"
         else:
-            mape     = float(mape_raw)
-            mape_str = f"{mape:.2f}%"
-            akurasi  = "tinggi" if mape < 10 else "cukup" if mape < 20 else "rendah"
-            mape_list.append(mape)
+            smape     = float(smape_raw)
+            smape_str = f"{smape:.2f}%"
+            akurasi  = "tinggi" if smape < 10 else "cukup" if smape < 20 else "rendah"
+            mape_list.append(smape)
 
         rmse_str = "N/A" if rmse_raw.lower() in ("-", "", "nan", "none") else rmse_raw
 
@@ -182,16 +230,16 @@ def generate_nlp_report_best(
             f"terendah {stats['min_val']:.2f} {satuan}. "
             f"Puncak pukul {stats['peak_hr']:02d}:00, "
             f"terendah pukul {stats['low_hr']:02d}:00. "
-            f"Model: {best_name} | MAPE {mape_str} | RMSE {rmse_str} "
+            f"Model: {best_name} | sMAPE {smape_str} | RMSE {rmse_str} "
             f"(akurasi {akurasi}).\n"
         )
 
-    # Rata-rata MAPE keseluruhan
+    # Rata-rata sMAPE keseluruhan
     if mape_list:
-        avg_mape     = sum(mape_list) / len(mape_list)
-        avg_akurasi  = "tinggi" if avg_mape < 10 else "cukup" if avg_mape < 20 else "rendah"
+        avg_smape     = sum(mape_list) / len(mape_list)
+        avg_akurasi  = "tinggi" if avg_smape < 10 else "cukup" if avg_smape < 20 else "rendah"
         lines.append(
-            f"\nRata-rata MAPE keseluruhan: {avg_mape:.2f}% "
+            f"\nRata-rata sMAPE keseluruhan: {avg_smape:.2f}% "
             f"— tingkat akurasi prediksi tergolong {avg_akurasi}."
         )
 

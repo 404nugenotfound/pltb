@@ -7,6 +7,7 @@ import Header from "@/app/components/layout/Header";
 
 import UploadState from "@/app/components/upload/UploadState";
 import MetricsSection from "@/app/components/metrics/MetricsSection";
+import OverfitChart from "@/app/components/overview/OverfitChart";
 
 import ProgressToast from "@/app/components/toast/ProgressToast";
 import { useMetrics } from "@/app/hooks/useMetrics";
@@ -19,7 +20,7 @@ import { useGenerateContext } from "@/app/context/GenerateContext";
 export default function ForecastingPage() {
   const [ selectedModel, setSelectedModel] = useState("all");
 
-  const { dataset_name, metrics, best_models, loading, refreshMetrics } = useMetrics();
+  const { dataset_name, metrics, best_models = [], loading, refreshMetrics } = useMetrics();
 
   const [ generateMode, setGenerateMode] = useState<"general" | "best">("general");
 
@@ -28,15 +29,6 @@ export default function ForecastingPage() {
   const [ uiState, setUiState] = useState<"idle" | "loading" | "nlp">("idle");
 
   const [ nlpReport, setNlpReport] = useState("");
-
-  // 1. useEffect
-  useEffect(() => {
-    const username = sessionStorage.getItem("ventara_username");
-    const savedState = sessionStorage.getItem(`ventara_ui_state_${username}`) as "idle" | "loading" | "nlp" | null;
-    const savedReport = sessionStorage.getItem(`ventara_nlp_report_${username}`);
-    if (savedState) setUiState(savedState);
-    if (savedReport) setNlpReport(savedReport);
-  }, []);
 
   async (nlpReport: String) => {
     const username = sessionStorage.getItem("ventara_username");
@@ -59,10 +51,21 @@ export default function ForecastingPage() {
 
     sessionStorage.setItem(`ventara_ui_state_${username}`, "nlp");
     sessionStorage.setItem(`ventara_nlp_report_${username}`, nlpReport as string);
+    sessionStorage.setItem(`ventara_selected_var_${username}`, selectedVars);
   }
 
   const ALL_VARS = ["RH2M", "WS10M", "WD10M"];
   const [selectedVars, setSelectedVars] = useState("WS10M");
+
+    // 1. useEffect
+  useEffect(() => {
+    const username = sessionStorage.getItem("ventara_username");
+    const savedState = sessionStorage.getItem(`ventara_ui_state_${username}`) as "idle" | "loading" | "nlp" | null;
+    const savedReport = sessionStorage.getItem(`ventara_nlp_report_${username}`);
+    if (savedState) setUiState(savedState);
+    if (savedReport) setNlpReport(savedReport);
+  }, []);
+
 
   return (
     <div className="flex h-screen">

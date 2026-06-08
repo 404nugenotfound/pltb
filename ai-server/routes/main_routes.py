@@ -271,3 +271,33 @@ def reset_dataset():
     return jsonify({
         "status": "ok"
     })
+    
+# =========================
+# OVERFIT METRICS
+# =========================
+@main_bp.route("/overfit_metrics")
+def overfit_metrics():
+    from training.metrics import load_metrics
+    from config import TRAIN_VARS
+
+    result = {}
+
+    for var in TRAIN_VARS:
+        ml, dl = load_metrics(var)
+        combined = {**(ml or {}), **(dl or {})}
+
+        var_result = {}
+        for model, val in combined.items():
+            if isinstance(val, dict) and "train" in val and "test" in val:
+                var_result[model] = {
+                    "train": val["train"],
+                    "test":  val["test"]
+                }
+
+        if var_result:
+            result[var] = var_result
+
+    if not result:
+        return jsonify({"error": "Metrics belum tersedia. Silakan train model dulu."}), 404
+
+    return jsonify(result)

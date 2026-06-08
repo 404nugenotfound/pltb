@@ -34,11 +34,20 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
             return False
 
         dl_cols  = [c for c in df.columns if c != target_var]
+        n_rows       = len(df)
+        split_train_rows = int(n_rows * 0.8)
+
+        X_all = df[dl_cols].values
+        y_all = df[target_var].values.reshape(-1, 1)
+
         scaler_X = MinMaxScaler()
         scaler_y = MinMaxScaler()
 
-        X_scaled = scaler_X.fit_transform(df[dl_cols].values).astype(np.float32)
-        y_scaled = scaler_y.fit_transform(df[target_var].values.reshape(-1, 1)).astype(np.float32)
+        scaler_X.fit(X_all[:split_train_rows])  # ← fit di 80% saja
+        scaler_y.fit(y_all[:split_train_rows])  # ← fit di 80% saja
+
+        X_scaled = scaler_X.transform(X_all).astype(np.float32)  # ← transform semua
+        y_scaled = scaler_y.transform(y_all).astype(np.float32)  # ← transform semua
 
         # ✅ Vectorized sequence building — jauh lebih cepat dari loop Python
         n        = len(X_scaled)
@@ -50,13 +59,15 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
         suffix = f"_{target_var}"
 
         # ✅ Split train/val manual — lebih efisien dari validation_split
-        split     = int(len(seqs) * 0.9)
-        X_train, X_val = seqs[:split],   seqs[split:]
-        y_train, y_val = targets[:split], targets[split:]
+        split_train = int(len(seqs) * 0.8)
+        split_val   = int(len(seqs) * 0.9)
+
+        X_train, X_val = seqs[:split_train],   seqs[split_train:split_val]
+        y_train, y_val = targets[:split_train], targets[split_train:split_val]
 
         es = EarlyStopping(
             monitor="val_loss",
-            patience=3,           # ✅ turun dari 5 → 3, stop lebih cepat
+            patience=2,           # ✅ turun dari 5 → 3, stop lebih cepat
             restore_best_weights=True
         )
 
@@ -70,8 +81,8 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
             model.fit(
                 X_train, y_train,
                 validation_data=(X_val, y_val),
-                epochs=20,
-                batch_size=256,   # ✅ naik dari 128 → 256, lebih cepat per epoch
+                epochs=10,      # ✅ turun dari 20 → 10, early stopping akan mengatasi jika kurang
+                batch_size=512,   # ✅ naik dari 128 → 256, lebih cepat per epoch
                 callbacks=callbacks,
                 verbose=1
             )
@@ -82,10 +93,10 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
         # LSTM
         # =========================
         lstm = Sequential([
-            KerasLSTM(64, return_sequences=True, input_shape=(STEP, n_feat)),
-            KerasLSTM(32),        # ✅ turun dari 64 → 32, lebih ringan
+            KerasLSTM(32, return_sequences=True, input_shape=(STEP, n_feat)),
+            KerasLSTM(16),        # ✅ turun dari 64 → 32, lebih ringan
             Dropout(0.2),
-            Dense(16, activation="relu"),  # ✅ turun dari 32 → 16
+            Dense(8, activation="relu"),  # ✅ turun dari 32 → 16
             Dense(1)
         ])
         build_and_train(lstm, "lstm")
@@ -97,15 +108,15 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
         # BiLSTM
         # =========================
         bilstm = Sequential([
-            Bidirectional(KerasLSTM(64, input_shape=(STEP, n_feat))),
+            Bidirectional(KerasLSTM(32, input_shape=(STEP, n_feat))),
             Dropout(0.2),
-            Dense(16, activation="relu"),  # ✅ turun dari 32 → 16
+            Dense(8, activation="relu"),  # ✅ turun dari 32 → 16
             Dense(1)
         ])
 
         # ✅ Reload callbacks karena clear_session
         callbacks = [
-            EarlyStopping(monitor="val_loss", patience=3, restore_best_weights=True)
+            EarlyStopping(monitor="val_loss", patience=2, restore_best_weights=True)
         ]
         if cancel_check:
             callbacks.append(CancelCallback(cancel_check))
@@ -114,8 +125,8 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
         bilstm.fit(
             X_train, y_train,
             validation_data=(X_val, y_val),
-            epochs=20,
-            batch_size=256,
+            epochs=10,
+            batch_size=512,
             callbacks=callbacks,
             verbose=1
         )

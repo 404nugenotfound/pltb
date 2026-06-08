@@ -1,13 +1,25 @@
 "use client";
 
+import dynamic from "next/dynamic";
+
 import Sidebar from "@/app/components/layout/Sidebar";
 import Header from "@/app/components/layout/Header";
 
 import OverviewHeader from "@/app/components/overview/OverviewHeader";
-import ForecastChart from "@/app/components/overview/ForecastChart";
 import NLPResult from "@/app/components/upload/NLPResult";
 import { useEffect, useState } from "react";
 import { useMetrics } from "@/app/hooks/useMetrics";
+
+const ForecastChart = dynamic(
+  () => import("@/app/components/overview/ForecastChart"),
+  { ssr: false },
+);
+
+
+const OverfitChart = dynamic(
+  () => import("@/app/components/overview/OverfitChart"),
+  { ssr: false },
+);
 
 export default function OverviewPage() {
   const [nlpReport, setNlpReport] = useState("");
@@ -20,8 +32,12 @@ export default function OverviewPage() {
     const username = sessionStorage.getItem("ventara_username");
 
     // cek sessionStorage dulu (dari history page)
-    const savedReport = sessionStorage.getItem(`ventara_nlp_report_${username}`);
-    const savedMode = sessionStorage.getItem(`ventara_generate_mode_${username}`);
+    const savedReport = sessionStorage.getItem(
+      `ventara_nlp_report_${username}`,
+    );
+    const savedMode = sessionStorage.getItem(
+      `ventara_generate_mode_${username}`,
+    );
     if (savedReport) setNlpReport(savedReport);
     if (savedMode) setGenerateMode(savedMode as "general" | "best");
 
@@ -101,6 +117,8 @@ export default function OverviewPage() {
               actualData={actualData}
               datasets={datasets}
             />
+
+            <OverfitChart />
           </div>
         </div>
       </main>

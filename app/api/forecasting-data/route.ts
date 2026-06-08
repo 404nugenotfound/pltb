@@ -8,6 +8,11 @@ export async function GET(req: NextRequest) {
       "X-Username": username,
     },
   });
+  if (!res.ok) {
+    const text = await res.text();
+    console.error("Flask error:", text);
+    return NextResponse.json({ error: "Flask error", detail: text }, { status: res.status });
+  }
   const data = await res.json();
   return NextResponse.json(data);
 }

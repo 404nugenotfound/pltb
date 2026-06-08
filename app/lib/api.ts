@@ -28,7 +28,7 @@ export async function cancelTraining() {
 }
 
 export async function clearTrainProgress() {
-  const res = await fetch("/api/clear-train-progress", {
+  const res = await fetch("/api/clear-training-progress", {
     method: "POST",
   });
 

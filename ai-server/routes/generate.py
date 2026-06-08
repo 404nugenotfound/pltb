@@ -361,7 +361,7 @@ def _worker_generate_best(username: str) -> None:
             metrics_dl_var = load_dl_metrics_for_var(var)
 
             # — Pilih DL terbaik —
-            best_dl_name = min(metrics_dl_var, key=lambda m: metrics_dl_var[m]["MAPE"]) if metrics_dl_var else "LSTM"
+            best_dl_name = min(metrics_dl_var, key=lambda m: metrics_dl_var[m]["sMAPE"]) if metrics_dl_var else "LSTM"
             dl_filename  = f"bilstm_{var}.h5" if best_dl_name.upper() == "BILSTM" else f"lstm_{var}.h5"
             print(f"🤖 Best DL [{var}]: {best_dl_name}")
 
@@ -485,13 +485,13 @@ def _worker_generate_best(username: str) -> None:
 
             # — Best model per var untuk NLP —
             all_met = {**metrics_var, **metrics_dl_var}
-            best_name_var = min(all_met, key=lambda m: all_met[m]["MAPE"]) if all_met else stacking_name
+            best_name_var = min(all_met, key=lambda m: all_met[m]["sMAPE"]) if all_met else stacking_name
             best_per_var[var] = (stacking_name, stacking_metrics)
 
             stacking_info.append(
                 f"{var} | Model: {stacking_name} | "
                 f"MAE={stacking_metrics['MAE']} RMSE={stacking_metrics['RMSE']} "
-                f"MAPE={stacking_metrics['MAPE']}% R2={stacking_metrics['R2']}"
+                f"sMAPE={stacking_metrics['sMAPE']}% R2={stacking_metrics['R2']}"
             )
 
             # ✅ Clear TF session antar variabel — bebaskan memory
