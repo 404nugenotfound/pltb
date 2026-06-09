@@ -12,40 +12,45 @@ interface ForecastingData {
   dataset_name: string;
   metrics: Record<string, ModelMetrics>;
   best_models: string[];
+  stacking_metrics: {          // ← tambah
+    xgb?: ModelMetrics;
+    xgbLstm?: ModelMetrics;
+    xgbBiLstm?: ModelMetrics;
+  };
 }
 
-export function useMetrics() {
+export function useMetrics(selectedVar: string = "WS10M") {  // ← tambah param
   const [data, setData] = useState<ForecastingData>({
     dataset_name: "",
     metrics: {},
     best_models: [],
+    stacking_metrics: {},
   });
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async () => {
     try {
       const username = sessionStorage.getItem("ventara_username") || "";
-      const res = await fetch(`/api/forecasting-data?username=${username}`);
+      const res = await fetch(`/api/forecasting-data?username=${username}&var=${selectedVar}`);  // ← tambah &var
       const json = await res.json();
-         // ✅ guard — jangan setData kalau response error
+      if (json.error || !json.metrics) return;  // ← tambah guard
       setData(json);
     } catch (e) {
       console.error("Failed to fetch metrics:", e);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedVar]);  // ← selectedVar jadi dependency
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
   useEffect(() => {
-  const handler = () => fetchData();
-  window.addEventListener("training-complete", handler);
-  return () => window.removeEventListener("training-complete", handler);
-}, [fetchData]);
+    const handler = () => fetchData();
+    window.addEventListener("training-complete", handler);
+    return () => window.removeEventListener("training-complete", handler);
+  }, [fetchData]);
 
-  // ✅ expose refreshMetrics
   return { ...data, loading, refreshMetrics: fetchData };
 }

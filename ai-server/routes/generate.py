@@ -332,6 +332,7 @@ def _worker_generate_best(username: str) -> None:
         stats_per_var   = {}   # untuk NLP report
         best_per_var    = {}   # untuk NLP report
         stacking_info   = []   # untuk header CSV
+        hist_preds_per_var = {}
 
         # =========================
         # LOOP PER VARIABEL
@@ -386,6 +387,13 @@ def _worker_generate_best(username: str) -> None:
             stacked_col   = f"XGB_{best_dl_name}_{var}"
             stacking_name = f"XGB-{best_dl_name} [{var}]"
             print(f"📊 Stacking [{var}]: {stacking_metrics}")
+            
+            # ✅ Simpan prediksi historis per variabel — buat digabung ke CSV nanti
+            hist_preds_per_var[var] = {
+                "stacked_col":   stacked_col,
+                "stacked_preds": stacked_preds,
+                "xgb_preds":     xgb.predict(X) if ML_READY and xgb is not None else None,
+            }
 
             # — Future forecast —
             target_series  = df[var].tolist()
@@ -499,16 +507,36 @@ def _worker_generate_best(username: str) -> None:
             tf.keras.backend.clear_session()
 
         # =========================
-        # GABUNG CSV — semua variabel dalam satu file
+        # GABUNG CSV — historis + future semua variabel
         # =========================
         if not all_future_dfs:
             raise ValueError("Tidak ada variabel yang berhasil diproses")
 
-        # Merge semua df_future berdasarkan YEAR, MO, DY, HR
-        df_combined = all_future_dfs[0][["YEAR", "MO", "DY", "HR"]].copy()
+        # ✅ Base historis — kolom aktual semua variabel
+        base_hist_cols = ["YEAR", "MO", "DY", "HR"] + [v for v in TRAIN_VARS if v in df.columns]
+        df_hist = df[base_hist_cols].copy()
+
+        # ✅ Tambahin kolom prediksi historis per variabel
+        for var, preds in hist_preds_per_var.items():
+            stacked_col   = preds["stacked_col"]
+            stacked_preds = preds["stacked_preds"]
+            xgb_preds     = preds["xgb_preds"]
+
+            if xgb_preds is not None:
+                df_hist[f"XGB_Base_{var}"] = np.nan
+                df_hist[f"XGB_Base_{var}"] = xgb_preds
+
+            df_hist[stacked_col] = np.nan
+            df_hist.loc[df_hist.index[STEP:], stacked_col] = stacked_preds
+
+        # ✅ Merge future dfs
+        df_future_combined = all_future_dfs[0][["YEAR", "MO", "DY", "HR"]].copy()
         for df_f in all_future_dfs:
             cols_to_add = [c for c in df_f.columns if c not in ["YEAR", "MO", "DY", "HR"]]
-            df_combined = df_combined.join(df_f[cols_to_add])
+            df_future_combined = df_future_combined.join(df_f[cols_to_add])
+
+        # ✅ Concat historis + future
+        df_combined = pd.concat([df_hist, df_future_combined], ignore_index=True)
 
         for col in ["YEAR", "MO", "DY", "HR"]:
             df_combined[col] = df_combined[col].astype(int)

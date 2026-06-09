@@ -20,7 +20,10 @@ import { useGenerateContext } from "@/app/context/GenerateContext";
 export default function ForecastingPage() {
   const [ selectedModel, setSelectedModel] = useState("all");
 
-  const { dataset_name, metrics, best_models = [], loading, refreshMetrics } = useMetrics();
+  const ALL_VARS = ["RH2M", "WS10M", "WD10M"];
+  const [selectedVars, setSelectedVars] = useState("WS10M");
+
+  const { dataset_name, metrics, best_models = [], stacking_metrics = {}, loading, refreshMetrics } = useMetrics(selectedVars);
 
   const [ generateMode, setGenerateMode] = useState<"general" | "best">("general");
 
@@ -54,16 +57,15 @@ export default function ForecastingPage() {
     sessionStorage.setItem(`ventara_selected_var_${username}`, selectedVars);
   }
 
-  const ALL_VARS = ["RH2M", "WS10M", "WD10M"];
-  const [selectedVars, setSelectedVars] = useState("WS10M");
-
     // 1. useEffect
   useEffect(() => {
     const username = sessionStorage.getItem("ventara_username");
     const savedState = sessionStorage.getItem(`ventara_ui_state_${username}`) as "idle" | "loading" | "nlp" | null;
     const savedReport = sessionStorage.getItem(`ventara_nlp_report_${username}`);
+    const savedMode   = sessionStorage.getItem(`ventara_generate_mode_${username}`);
     if (savedState) setUiState(savedState);
     if (savedReport) setNlpReport(savedReport);
+    if (savedMode)   setGenerateMode(savedMode as "general" | "best");
   }, []);
 
 
@@ -221,6 +223,7 @@ export default function ForecastingPage() {
                 metrics={metrics}
                 selectedModel={selectedModel}
                 bestModels={best_models}
+                stackingMetrics={stacking_metrics}
               />
 
               {/* BUTTON */}
@@ -249,6 +252,7 @@ export default function ForecastingPage() {
 
                         sessionStorage.setItem(`ventara_ui_state_${username}`, "nlp");
                         sessionStorage.setItem(`ventara_nlp_report_${username}`, nlpReport);
+                        sessionStorage.setItem(`ventara_generate_mode_${username}`, selectedModel === "best" ? "best" : "general");
                       },
                        selectedVars  // ← tambah argument ketiga
                     )

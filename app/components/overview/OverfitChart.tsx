@@ -16,8 +16,53 @@ interface OverfitData {
   };
 }
 
+interface OverfitChartProps {
+  selectedVar?: string;
+}
+
 const COLOR_TRAIN = "#14b8a6";
 const COLOR_TEST  = "#3b82f6";
+
+function getOverallStatus(current: ModelMetrics) {
+  let overfit = 0;
+  let warning = 0;
+
+  METRICS.forEach((metric) => {
+    const gap = overfitGap(
+      metric,
+      current.train[metric],
+      current.test[metric]
+    );
+
+    const pct = Math.abs(gap / (current.train[metric] || 1)) * 100;
+    const { fit, warn } = getThreshold(metric);
+
+    if (pct >= warn) overfit++;
+    else if (pct >= fit) warning++;
+  });
+
+  if (overfit >= 2) {
+    return {
+      label: "Potensi Overfitting Tinggi",
+      color: "text-red-600",
+      bg: "bg-red-50 border-red-200",
+    };
+  }
+
+  if (warning >= 2) {
+    return {
+      label: "Perlu Perhatian",
+      color: "text-yellow-700",
+      bg: "bg-yellow-50 border-yellow-200",
+    };
+  }
+
+  return {
+    label: "Generalisasi Baik",
+    color: "text-emerald-700",
+    bg: "bg-emerald-50 border-emerald-200",
+  };
+}
 
 function overfitGap(metric: Metric, train: number, test: number) {
   return metric === "R2" ? train - test : test - train;
@@ -67,7 +112,7 @@ function MetricCard({ metric, train, test }: { metric: Metric; train: number; te
   );
 }
 
-export default function OverfitChart() {
+export default function OverfitChart({ selectedVar: selectedVarProp }: OverfitChartProps) {
   const [data, setData] = useState<OverfitData>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -80,18 +125,23 @@ export default function OverfitChart() {
       .then((json) => {
         if (json.error) { setError(json.error); return; }
         setData(json);
-        const firstVar = Object.keys(json)[0] ?? "";
+
+        // ✅ kalau ada selectedVarProp, pakai itu — otherwise pakai first key
+        const firstVar = selectedVarProp && json[selectedVarProp]
+          ? selectedVarProp
+          : Object.keys(json)[0] ?? "";
         const firstModel = Object.keys(json[firstVar] ?? {})[0] ?? "";
         setSelectedVar(firstVar);
         setSelectedModel(firstModel);
       })
-      .catch(() => setError(""))
+      .catch(() => setError("Gagal fetch data overfit."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [selectedVarProp]);
 
   const vars   = Object.keys(data);
   const models = Object.keys(data[selectedVar] ?? {});
   const current = data[selectedVar]?.[selectedModel];
+  const overall = current ? getOverallStatus(current) : null;
 
   if (loading)
     return <div className="text-sm text-gray-400 p-6">Memuat data...</div>;
@@ -108,16 +158,19 @@ export default function OverfitChart() {
           <p className="text-sm text-gray-400">Perbandingan performa train vs test per model</p>
         </div>
         <div className="flex gap-2">
-          <select
-            value={selectedVar}
-            onChange={(e) => {
-              setSelectedVar(e.target.value);
-              setSelectedModel(Object.keys(data[e.target.value] ?? {})[0] ?? "");
-            }}
-            className="border border-gray-200 text-black rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
-          >
-            {vars.map((v) => <option key={v} value={v}>{v}</option>)}
-          </select>
+          {/* ✅ sembunyiin var selector kalau selectedVarProp di-pass */}
+          {!selectedVarProp && (
+            <select
+              value={selectedVar}
+              onChange={(e) => {
+                setSelectedVar(e.target.value);
+                setSelectedModel(Object.keys(data[e.target.value] ?? {})[0] ?? "");
+              }}
+              className="border border-gray-200 text-black rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              {vars.map((v) => <option key={v} value={v}>{v}</option>)}
+            </select>
+          )}
           <select
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
@@ -167,6 +220,7 @@ export default function OverfitChart() {
               </span>
             ))}
           </div>
+          
         </>
       ) : (
         <p className="text-sm text-gray-400">Model belum tersedia untuk kombinasi ini.</p>

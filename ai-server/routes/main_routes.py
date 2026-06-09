@@ -138,26 +138,30 @@ def forecasting_data():
     from training.metrics import load_metrics_for_var, load_dl_metrics_for_var
     from config import TARGET
 
-    username = request.headers.get("X-Username") or session.get("username")
+    username     = request.headers.get("X-Username") or session.get("username")
+    selected_var = request.args.get("var", TARGET)
 
-    # ✅ Baca langsung dari metrics.json per variabel — selalu fresh
-    from config import TRAIN_VARS
+    # ✅ Cukup load metrics untuk variabel yang dipilih saja
     all_metrics = {}
-    for var in TRAIN_VARS:
-        ml_v  = load_metrics_for_var(var)
-        dl_v  = load_dl_metrics_for_var(var)
-        all_metrics.update(ml_v)
-        all_metrics.update(dl_v)
+    all_metrics.update(load_metrics_for_var(selected_var))
+    all_metrics.update(load_dl_metrics_for_var(selected_var))
 
     # Fallback ke app global kalau metrics.json kosong
     if not all_metrics:
         all_metrics = {**_app.metrics, **_app.metrics_dl}
 
     best_model_names = get_best_ml_and_dl(
-        load_metrics_for_var(TARGET),
-        load_dl_metrics_for_var(TARGET)
+        load_metrics_for_var(selected_var),
+        load_dl_metrics_for_var(selected_var)
     )
-
+    
+    stacking_raw = load_stacking_metrics_for_var(selected_var)
+    stacking_metrics = {
+        "xgb":       all_metrics.get("XGB"),
+        "xgbLstm":   stacking_raw.get("XGB_LSTM"),
+        "xgbBiLstm": stacking_raw.get("XGB_BiLSTM"),
+    }
+    
     dataset_name = ""
     if username:
         user = load_user(username)
@@ -169,7 +173,8 @@ def forecasting_data():
     return jsonify({
         "dataset_name": dataset_name,
         "metrics":      all_metrics,
-        "best_models":  best_model_names
+        "best_models":  best_model_names,
+        "stacking_metrics":  stacking_metrics,
     })
     
 # =========================

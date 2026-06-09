@@ -26,6 +26,7 @@ export default function OverviewPage() {
   const [generateMode, setGenerateMode] = useState<"general" | "best">(
     "general",
   );
+  const [activeVar, setActiveVar] = useState("WS10M");
   const { dataset_name } = useMetrics();
 
   useEffect(() => {
@@ -38,8 +39,12 @@ export default function OverviewPage() {
     const savedMode = sessionStorage.getItem(
       `ventara_generate_mode_${username}`,
     );
+    const savedVar = sessionStorage.getItem(
+      `ventara_active_var_${username}`,
+    );
     if (savedReport) setNlpReport(savedReport);
     if (savedMode) setGenerateMode(savedMode as "general" | "best");
+    if (savedVar) setActiveVar(savedVar);
 
     fetch("http://localhost:5000/overview_data", {
       credentials: "include",
@@ -104,6 +109,7 @@ export default function OverviewPage() {
               generateMode={generateMode}
               nlpReport={nlpReport}
             />
+            <OverfitChart selectedVar={generateMode === "general" ? activeVar : undefined} />
 
             <NLPResult
               nlpReport={nlpReport}
@@ -117,8 +123,6 @@ export default function OverviewPage() {
               actualData={actualData}
               datasets={datasets}
             />
-
-            <OverfitChart />
           </div>
         </div>
       </main>

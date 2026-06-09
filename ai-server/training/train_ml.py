@@ -62,26 +62,31 @@ def train_ml_models(X, y, features, suffix=""):
     joblib.dump(xgb, f"{MODEL_FOLDER}/xgb{suffix}.pkl")
 
     # =========================
-    # KNN — auto-tune n_neighbors
+    # KNN — reduce overfit
     # =========================
-    from sklearn.model_selection import cross_val_score
-
     scaler = MinMaxScaler()
     X_knn_train = scaler.fit_transform(X_train)
+    X_knn_val   = scaler.transform(X_val)  # ← tambah ini
 
-    best_k     = 7
+    sample_size = min(15000, len(X_knn_train))
+    idx = np.random.choice(len(X_knn_train), sample_size, replace=False)
+    X_sample = X_knn_train[idx]
+    y_sample = y_train[idx]
+
+    best_k     = 101
     best_score = -np.inf
 
-    for k in [15, 21, 27, 33, 41]:  # ← jauh lebih besar dari default 5, karena data lebih besar dan lebih kompleks
+    for k in [51, 71, 101, 151, 201]:  # ← k lebih besar = smoother
         try:
             knn_candidate = KNeighborsRegressor(
                 n_neighbors=k,
-                metric="euclidean", 
+                metric="euclidean",
                 algorithm="ball_tree",
+                weights="uniform",   # ← ganti dari "distance"
                 n_jobs=-1
             )
             scores = cross_val_score(
-                knn_candidate, X_knn_train, y_train,
+                knn_candidate, X_sample, y_sample,
                 cv=3, scoring="r2", n_jobs=-1
             )
             mean_score = scores.mean()
@@ -92,17 +97,11 @@ def train_ml_models(X, y, features, suffix=""):
         except Exception as e:
             print(f"  KNN k={k} gagal: {e}")
 
-    if best_score == -np.inf:
-        best_k = 7
-        print(f"⚠️ Cross-val gagal, pakai default k=7")
-
-    print(f"✅ KNN best k={best_k}")
-
     knn = KNeighborsRegressor(
         n_neighbors=best_k,
         metric="euclidean",
         algorithm="ball_tree",
-        weights="uniform",
+        weights="uniform",   # ← key fix
         n_jobs=-1
     )
     knn.fit(X_knn_train, y_train)
