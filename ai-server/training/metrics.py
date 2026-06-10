@@ -136,3 +136,55 @@ def compute_metrics_fresh(
             
     save_metrics(ml, dl, var_name)   # ✅ pakai var_name
     return ml, dl
+
+def save_ensemble_metrics(var_name: str, ml_name: str, dl_name: str, metrics: dict):
+    """Simpan metrics ensemble ke JSON — disimpan di key 'ensemble' per variabel."""
+    os.makedirs(MODEL_FOLDER, exist_ok=True)
+
+    existing = {}
+    if os.path.exists(METRICS_PATH):
+        with open(METRICS_PATH, "r") as f:
+            existing = json.load(f)
+
+    if var_name not in existing:
+        existing[var_name] = {}
+
+    existing[var_name]["ensemble"] = {
+        "ml_name": ml_name,
+        "dl_name": dl_name,
+        "components": [ml_name, dl_name],  # ← tambah ini
+        f"{ml_name}+{dl_name}": {
+            "train": metrics,
+            "test":  metrics,
+        }
+    }
+
+    with open(METRICS_PATH, "w") as f:
+        json.dump(existing, f, indent=2)
+    print(f"✅ Ensemble metrics [{var_name}] disimpan")
+
+def load_ensemble_metrics(var_name: str):
+    """Load ensemble metrics untuk variabel tertentu."""
+    if not os.path.exists(METRICS_PATH):
+        return {}
+    with open(METRICS_PATH, "r") as f:
+        data = json.load(f)
+    ensemble = data.get(var_name, {}).get("ensemble", {})
+    if not ensemble:
+        return {}
+    ml_name = ensemble.get("ml_name", "")
+    dl_name = ensemble.get("dl_name", "")
+    key     = f"{ml_name}+{dl_name}"
+    return {key: ensemble.get(key, {})}
+
+def load_ensemble_components():
+    if not os.path.exists(METRICS_PATH):
+        return {}
+    with open(METRICS_PATH, "r") as f:
+        data = json.load(f)
+    result = {}
+    for var, val in data.items():
+        components = val.get("ensemble", {}).get("components", [])
+        if components:
+            result[var] = components
+    return result

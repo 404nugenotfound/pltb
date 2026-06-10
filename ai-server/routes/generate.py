@@ -52,7 +52,8 @@ def get_progress():
         "elapsed":    f"{int(elapsed//60)}m {int(elapsed%60)}s",
         "error":      p.get("error"),
         "nlp_report": p.get("nlp_report"),
-        "last_mode":  p.get("last_mode", "general")
+        "last_mode":  p.get("last_mode", "general"),
+        "ensemble_summary": p.get("ensemble_summary", {})
     })
 
 # =========================
@@ -333,6 +334,7 @@ def _worker_generate_best(username: str) -> None:
         best_per_var    = {}   # untuk NLP report
         stacking_info   = []   # untuk header CSV
         hist_preds_per_var = {}
+        ensemble_summary = {}
 
         # =========================
         # LOOP PER VARIABEL
@@ -384,6 +386,17 @@ def _worker_generate_best(username: str) -> None:
                 np.array(y[STEP:STEP + len(stacked_preds)]),
                 np.array(stacked_preds)
             )
+            
+            from training.metrics import save_ensemble_metrics
+            save_ensemble_metrics(var, "XGB", best_dl_name, stacking_metrics)
+            
+            ensemble_summary[var] = {
+                "ml": "XGB",
+                "dl": best_dl_name,
+                "ensemble": f"XGB + {best_dl_name}",
+                "metrics": stacking_metrics
+            }
+            
             stacked_col   = f"XGB_{best_dl_name}_{var}"
             stacking_name = f"XGB-{best_dl_name} [{var}]"
             print(f"📊 Stacking [{var}]: {stacking_metrics}")
@@ -507,6 +520,18 @@ def _worker_generate_best(username: str) -> None:
             tf.keras.backend.clear_session()
 
         # =========================
+        # DEBUG
+        # =========================
+        print("\n" + "="*50)
+        print("📦 ENSEMBLE SUMMARY")
+        print("="*50)
+
+        import json
+        print(json.dumps(ensemble_summary, indent=2))
+
+        print("="*50 + "\n")
+
+        # =========================
         # GABUNG CSV — historis + future semua variabel
         # =========================
         if not all_future_dfs:
@@ -565,9 +590,11 @@ def _worker_generate_best(username: str) -> None:
 
         with progress_lock:
             generate_progress[username].update({
-                "running": False, "done": True,
+                "running": False,
+                "done": True,
                 "nlp_report": nlp_report,
                 "last_mode": "best",
+                "ensemble_summary": ensemble_summary,
                 "error": None
             })
 

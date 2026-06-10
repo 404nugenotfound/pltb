@@ -9,14 +9,14 @@ RH2M | Model: XGB-BiLSTM [RH2M] | MAE=26.242 RMSE=27.9 sMAPE=36.34% R2=-5.741
 Forecast Summary:
 Ringkasan prediksi cuaca untuk periode 01-01-2023 hingga 08-01-2023:
 
-▸ Kecepatan angin (WS10M): rata-rata 4.00 m/s, kategori angin sedang, tren relatif stabil sepanjang periode. Tertinggi 4.85 m/s, terendah 3.00 m/s. Puncak pukul 09:00, terendah pukul 23:00. Model: XGB-LSTM [WS10M] | sMAPE 8.77% | RMSE 0.335 (akurasi tinggi).
+▸ Kecepatan angin (WS10M): rata-rata **4.00 m/s**, kategori **angin sedang**, tren relatif stabil sepanjang periode. Tertinggi **4.85 m/s**, terendah **3.00 m/s**. Puncak pukul **09:00**, terendah pukul **23:00**. Model: **XGB-LSTM [WS10M]** | sMAPE **8.77%** | RMSE **0.335** (akurasi **tinggi**).
 
-▸ Arah angin (WD10M): rata-rata 68.90 derajat, kategori dari timur laut, tren menurun menuju akhir periode. Tertinggi 360.00 derajat, terendah 41.64 derajat. Puncak pukul 07:00, terendah pukul 06:00. Model: XGB-LSTM [WD10M] | sMAPE 99.90% | RMSE 129.441 (akurasi rendah).
+▸ Arah angin (WD10M): rata-rata **68.90 derajat**, kategori **dari timur laut**, tren menurun menuju akhir periode. Tertinggi **360.00 derajat**, terendah **41.64 derajat**. Puncak pukul **07:00**, terendah pukul **06:00**. Model: **XGB-LSTM [WD10M]** | sMAPE **99.90%** | RMSE **129.441** (akurasi **rendah**).
 
-▸ Kelembaban udara (RH2M): rata-rata 64.53 %, kategori nyaman, tren meningkat menuju akhir periode. Tertinggi 76.76 %, terendah 58.02 %. Puncak pukul 06:00, terendah pukul 15:00. Model: XGB-BiLSTM [RH2M] | sMAPE 36.34% | RMSE 27.9 (akurasi rendah).
+▸ Kelembaban udara (RH2M): rata-rata **64.53 %**, kategori **nyaman**, tren meningkat menuju akhir periode. Tertinggi **76.76 %**, terendah **58.02 %**. Puncak pukul **06:00**, terendah pukul **15:00**. Model: **XGB-BiLSTM [RH2M]** | sMAPE **36.34%** | RMSE **27.9** (akurasi **rendah**).
 
 
-Rata-rata sMAPE keseluruhan: 48.34% — tingkat akurasi prediksi tergolong rendah.
+Rata-rata sMAPE keseluruhan: **48.34%** — tingkat akurasi prediksi tergolong **rendah**.
 
 -END HEADER-
 

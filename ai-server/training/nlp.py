@@ -223,15 +223,15 @@ def generate_nlp_report_best(
 
         lines.append(
             f"▸ {nama.capitalize()} ({var}): "
-            f"rata-rata {stats['avg']:.2f} {satuan}, "
-            f"kategori {stats['category']}, "
+            f"rata-rata **{stats['avg']:.2f} {satuan}**, "
+            f"kategori **{stats['category']}**, "
             f"tren {stats['trend']}. "
-            f"Tertinggi {stats['max_val']:.2f} {satuan}, "
-            f"terendah {stats['min_val']:.2f} {satuan}. "
-            f"Puncak pukul {stats['peak_hr']:02d}:00, "
-            f"terendah pukul {stats['low_hr']:02d}:00. "
-            f"Model: {best_name} | sMAPE {smape_str} | RMSE {rmse_str} "
-            f"(akurasi {akurasi}).\n"
+            f"Tertinggi **{stats['max_val']:.2f} {satuan}**, "
+            f"terendah **{stats['min_val']:.2f} {satuan}**. "
+            f"Puncak pukul **{stats['peak_hr']:02d}:00**, "
+            f"terendah pukul **{stats['low_hr']:02d}:00**. "
+            f"Model: **{best_name}** | sMAPE **{smape_str}** | RMSE **{rmse_str}** "
+            f"(akurasi **{akurasi}**).\n"
         )
 
     # Rata-rata sMAPE keseluruhan
@@ -239,8 +239,8 @@ def generate_nlp_report_best(
         avg_smape     = sum(mape_list) / len(mape_list)
         avg_akurasi  = "tinggi" if avg_smape < 10 else "cukup" if avg_smape < 20 else "rendah"
         lines.append(
-            f"\nRata-rata sMAPE keseluruhan: {avg_smape:.2f}% "
-            f"— tingkat akurasi prediksi tergolong {avg_akurasi}."
+            f"\nRata-rata sMAPE keseluruhan: **{avg_smape:.2f}%** "
+            f"— tingkat akurasi prediksi tergolong **{avg_akurasi}**."
         )
 
     return "\n".join(lines)

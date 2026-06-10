@@ -11,7 +11,11 @@ interface GenerateState {
 
 interface GenerateContextValue {
   generate: GenerateState;
-  startGenerate: (model: string, onDone?: (nlp: string) => void, selectedVar?: string) => void;
+  startGenerate: (
+    model: string,
+    onDone?: (nlp: string, ensembleSummary: Record<string, any>) => void,
+    selectedVar?: string
+  ) => void;
 }
 
 const DEFAULT: GenerateState = {
@@ -28,7 +32,9 @@ export function GenerateProvider({ children }: { children: React.ReactNode }) {
   const [generate, setGenerate] = useState<GenerateState>(DEFAULT);
   const pollActive = useRef(false);
 
-  const pollOnce = useCallback(async (onDone?: (nlp: string) => void) => {
+  const pollOnce = useCallback(async (
+    onDone?: (nlp: string, ensembleSummary: Record<string, any>) => void
+  ) => {
     if (!pollActive.current) return;
     try {
       const res = await fetch("/api/generate-progress");
@@ -52,7 +58,6 @@ export function GenerateProvider({ children }: { children: React.ReactNode }) {
         pollActive.current = false;
         setGenerate(prev => ({ ...prev, percent: 100 }));
 
-        // ✅ generate_commit tetap ke-trigger meski pindah page
         await fetch("http://localhost:5000/generate_commit", {
           method: "POST",
           credentials: "include",
@@ -60,7 +65,10 @@ export function GenerateProvider({ children }: { children: React.ReactNode }) {
 
         setTimeout(() => {
           setGenerate(DEFAULT);
-          onDone?.(prog.nlp_report ?? "");
+          onDone?.(
+            prog.nlp_report ?? "",
+            prog.ensemble_summary ?? {}   // ← pass ensemble_summary
+          );
         }, 1000);
         return;
       }
@@ -75,15 +83,16 @@ export function GenerateProvider({ children }: { children: React.ReactNode }) {
 
   const startGenerate = useCallback(async (
     selectedModel: string,
-    onDone?: (nlp: string) => void,
+    onDone?: (nlp: string, ensembleSummary: Record<string, any>) => void,
     selectedVar: string = "WS10M",
   ) => {
-    console.log("selectedVar dikirim:", selectedVar);  // ← tambah
+    console.log("selectedVar dikirim:", selectedVar);
     setGenerate({ ...DEFAULT, visible: true });
     try {
       const formData = new FormData();
       formData.append("model", selectedModel);
       formData.append("var", selectedVar);
+
       const endpoint = selectedModel === "best" ? "/api/generate-best" : "/api/generate";
       const res = await fetch(endpoint, { method: "POST", body: formData });
       const data = await res.json();

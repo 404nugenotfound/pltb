@@ -1,4 +1,5 @@
 import { downloadCsv } from "@/app/lib/api";
+import ReactMarkdown from "react-markdown";
 
 interface Props {
   nlpReport: string;
@@ -37,9 +38,20 @@ export default function NLPResult({
             AI Forecast Summary
           </h3>
 
-          <p className="text-sm text-gray-700 leading-relaxed text-justify white">
+          <ReactMarkdown
+            components={{
+              p: ({ children }) => (
+                <p className="text-sm text-gray-700 leading-relaxed text-justify mb-2 last:mb-0">
+                  {children}
+                </p>
+              ),
+              strong: ({ children }) => (
+                <strong className="font-semibold text-gray-900">{children}</strong>
+              ),
+            }}
+          >
             {nlpReport}
-          </p>
+          </ReactMarkdown>
 
           {/* ACTIONS */}
           {!hideActions && (  
