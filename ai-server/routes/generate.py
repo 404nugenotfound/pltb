@@ -17,6 +17,7 @@ from utils.progress import *
 
 from training.nlp import *
 from training.metrics import load_metrics_for_var, load_dl_metrics_for_var
+from training.metrics import get_metrics_for_var, save_ensemble_metrics
 
 from config import OUTPUT_FOLDER
 
@@ -364,7 +365,10 @@ def _worker_generate_best(username: str) -> None:
             metrics_dl_var = load_dl_metrics_for_var(var)
 
             # — Pilih DL terbaik —
-            best_dl_name = min(metrics_dl_var, key=lambda m: metrics_dl_var[m]["sMAPE"]) if metrics_dl_var else "LSTM"
+            best_dl_name = min(
+                metrics_dl_var,
+                key=lambda m: metrics_dl_var[m].get("primary_value", metrics_dl_var[m].get("sMAPE", 999))
+            ) if metrics_dl_var else "LSTM"
             dl_filename  = f"bilstm_{var}.h5" if best_dl_name.upper() == "BILSTM" else f"lstm_{var}.h5"
             print(f"🤖 Best DL [{var}]: {best_dl_name}")
 
@@ -382,9 +386,10 @@ def _worker_generate_best(username: str) -> None:
                 _lstm.predict(seqs_hist, verbose=0)
             ).flatten()
 
-            stacking_metrics = get_metrics(
+            stacking_metrics = get_metrics_for_var(
                 np.array(y[STEP:STEP + len(stacked_preds)]),
-                np.array(stacked_preds)
+                np.array(stacked_preds),
+                var  # ← tambah ini
             )
             
             from training.metrics import save_ensemble_metrics
@@ -509,10 +514,12 @@ def _worker_generate_best(username: str) -> None:
             best_name_var = min(all_met, key=lambda m: all_met[m]["sMAPE"]) if all_met else stacking_name
             best_per_var[var] = (stacking_name, stacking_metrics)
 
+            pm = stacking_metrics.get("primary_metric", "sMAPE")
+            pv = stacking_metrics.get("primary_value", stacking_metrics.get("sMAPE", "?"))
             stacking_info.append(
                 f"{var} | Model: {stacking_name} | "
                 f"MAE={stacking_metrics['MAE']} RMSE={stacking_metrics['RMSE']} "
-                f"sMAPE={stacking_metrics['sMAPE']}% R2={stacking_metrics['R2']}"
+                f"{pm}={pv}{'°' if pm == 'CircularMAE' else '%' if pm == 'sMAPE' else ''} R2={stacking_metrics['R2']}"
             )
 
             # ✅ Clear TF session antar variabel — bebaskan memory

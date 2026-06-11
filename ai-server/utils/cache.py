@@ -14,11 +14,8 @@ def _flatten_to_test(metrics_dict: dict) -> dict:
             result[model] = val  # fallback format lama
     return result
 
-def get_metrics_cache_path(dataset_path: str = ""):
-    if not dataset_path:
-        dataset_path = get_active_dataset_path()
-    name = os.path.basename(dataset_path).replace(".csv", "")
-    return os.path.join(MODEL_FOLDER, f"cache_{name}.json")
+def get_metrics_cache_path():
+    return os.path.join(MODEL_FOLDER, "cache.json")
 
 def get_model_cache_dir(dataset_path: str = ""):
     if not dataset_path:

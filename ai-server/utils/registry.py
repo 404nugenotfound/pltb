@@ -93,11 +93,6 @@ def is_dataset_already_trained(
 # =========================
 # MODEL SNAPSHOT DIR
 # =========================
-def get_model_dir_for_hash(
-    file_hash: str
-) -> str:
-
-    return os.path.join(
-        MODEL_FOLDER,
-        f"snap_{file_hash[:12]}"
-    )
+def get_model_dir_for_hash(file_hash: str, username: str = "") -> str:
+    suffix = f"{username}_{file_hash[:8]}" if username else file_hash[:12]
+    return os.path.join(MODEL_FOLDER, f"snap_{suffix}")
