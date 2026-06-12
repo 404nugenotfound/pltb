@@ -188,6 +188,7 @@ def forecasting_data():
         "best_models": best_model_names,
         "ensemble_summary": ensemble_summary
     })   
+    
 # =========================
 # ANALITIK
 # =========================

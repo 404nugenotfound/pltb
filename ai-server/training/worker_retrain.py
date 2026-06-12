@@ -8,11 +8,11 @@ from config import *
 
 from training.train_ml import *
 from training.train_dl import *
-from training.metrics import compute_metrics_fresh
 from training.feature_engineering import load_and_engineer
 
 from utils.registry import *
 from utils.reload_state import reload_all_globals
+from utils.cache import load_or_compute_metrics
 
 
 def worker_retrain(
@@ -149,7 +149,7 @@ def worker_retrain(
                 lstm_v     = dl_state_v["lstm"]
                 bilstm_v   = dl_state_v["bilstm"]
 
-                ml_v, dl_v = compute_metrics_fresh(
+                ml_v, dl_v = load_or_compute_metrics(
                     ML_READY_V, DL_READY_V,
                     gbr_v, xgb_v, knn_v, scaler_v,
                     X_v, y_v,

@@ -67,8 +67,9 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
 
         es = EarlyStopping(
             monitor="val_loss",
-            patience=2,           # ✅ turun dari 5 → 3, stop lebih cepat
-            restore_best_weights=True
+            patience=5,                # ✅ tetap 5 — cukup untuk 87K rows
+            restore_best_weights=True,
+            min_delta=0.0001           # ✅ BARU: abaikan improvement terlalu kecil
         )
 
         callbacks = [es]
@@ -81,8 +82,8 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
             model.fit(
                 X_train, y_train,
                 validation_data=(X_val, y_val),
-                epochs=10,      # ✅ turun dari 20 → 10, early stopping akan mengatasi jika kurang
-                batch_size=512,   # ✅ naik dari 128 → 256, lebih cepat per epoch
+                epochs=30,             # ✅ naik dari 10 → 30, beri ruang konvergen
+                batch_size=512,        # ✅ tetap 512, oke untuk 87K rows
                 callbacks=callbacks,
                 verbose=1
             )
@@ -91,12 +92,13 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
 
         # =========================
         # LSTM
+        # ✅ Diperkuat: n_feat ~26 + STEP=48, layer lama terlalu kecil
         # =========================
         lstm = Sequential([
-            KerasLSTM(32, return_sequences=True, input_shape=(STEP, n_feat)),
-            KerasLSTM(16),        # ✅ turun dari 64 → 32, lebih ringan
+            KerasLSTM(64, return_sequences=True, input_shape=(STEP, n_feat)),  # 32 → 64
+            KerasLSTM(32),                                                      # 16 → 32
             Dropout(0.2),
-            Dense(8, activation="relu"),  # ✅ turun dari 32 → 16
+            Dense(16, activation="relu"),                                       # 8 → 16
             Dense(1)
         ])
         build_and_train(lstm, "lstm")
@@ -109,14 +111,19 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
         # =========================
         bilstm = Sequential([
             Bidirectional(KerasLSTM(32, input_shape=(STEP, n_feat))),
-            Dropout(0.2),
-            Dense(8, activation="relu"),  # ✅ turun dari 32 → 16
+            Dropout(0.3),              # ✅ naik dari 0.2 → 0.3, kurangi gap MAE
+            Dense(8, activation="relu"),
             Dense(1)
         ])
 
         # ✅ Reload callbacks karena clear_session
         callbacks = [
-            EarlyStopping(monitor="val_loss", patience=2, restore_best_weights=True)
+            EarlyStopping(
+                monitor="val_loss",
+                patience=5,            # ✅ tetap 5
+                restore_best_weights=True,
+                min_delta=0.0001       # ✅ BARU: sama seperti LSTM
+            )
         ]
         if cancel_check:
             callbacks.append(CancelCallback(cancel_check))
@@ -125,8 +132,8 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
         bilstm.fit(
             X_train, y_train,
             validation_data=(X_val, y_val),
-            epochs=10,
-            batch_size=512,
+            epochs=30,                 # ✅ naik dari 10 → 30
+            batch_size=512,            # ✅ tetap 512
             callbacks=callbacks,
             verbose=1
         )

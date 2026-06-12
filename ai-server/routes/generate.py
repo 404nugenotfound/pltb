@@ -18,6 +18,7 @@ from utils.progress import *
 from training.nlp import *
 from training.metrics import load_metrics_for_var, load_dl_metrics_for_var
 from training.metrics import get_metrics_for_var, save_ensemble_metrics
+from training.feature_engineering import load_and_engineer
 
 from config import OUTPUT_FOLDER
 
@@ -195,7 +196,13 @@ def _worker_generate_full(
                 elif col == "DY":     fv.append(int(next_time.day))
                 elif col == "MO":     fv.append(int(next_time.month))
                 elif col == "YEAR":   fv.append(int(next_time.year))
+                elif col == "hour_sin":    fv.append(float(np.sin(2 * np.pi * next_time.hour / 24)))
+                elif col == "hour_cos":    fv.append(float(np.cos(2 * np.pi * next_time.hour / 24)))
+                elif col == "WD10M_sin":   fv.append(float(np.sin(np.deg2rad(target_series[-1]))))
+                elif col == "WD10M_cos":   fv.append(float(np.cos(np.deg2rad(target_series[-1]))))
                 else:                 fv.append(float(last_row_dict.get(col, 0.0)))
+                
+                
 
             X_fut    = np.array(fv, dtype=np.float32).reshape(1, -1)
             pred_gbr = float(gbr.predict(X_fut)[0])                    if ("GBR" in active_models and gbr    is not None)                        else float("nan")
@@ -223,6 +230,11 @@ def _worker_generate_full(
                     new_row["lag24"]      = lag24
                     new_row["mean3"]      = mean3
                     new_row["mean24"]     = mean24
+                    if selected_var == "WD10M":
+                        if "WD10M_sin" in new_row.index:
+                            new_row["WD10M_sin"] = float(np.sin(np.deg2rad(pred_xgb)))
+                        if "WD10M_cos" in new_row.index:
+                            new_row["WD10M_cos"] = float(np.cos(np.deg2rad(pred_xgb)))
 
                     history_window = pd.concat(
                         [history_window.iloc[1:], pd.DataFrame([new_row])],
@@ -351,7 +363,8 @@ def _worker_generate_best(username: str) -> None:
 
             # — Load model —
             gbr, xgb, knn, scaler, FEATURES = load_ml_for_var(var)
-            dl_state      = load_dl_for_var(df, var)
+            df_var        = load_and_engineer(get_active_dataset_path(), target_var=var)  # ← tambah ini
+            dl_state      = load_dl_for_var(df_var, var)  # ← df_var
             DL_READY      = dl_state["DL_READY"]
             scaler_X      = dl_state["scaler_X"]
             scaler_y      = dl_state["scaler_y"]
@@ -376,11 +389,11 @@ def _worker_generate_best(username: str) -> None:
             _dl_cols = DL_INPUT_COLS if DL_INPUT_COLS else [c for c in df.columns if c != var]
 
             ML_READY = all([gbr is not None, xgb is not None, scaler is not None, len(FEATURES) > 0])
-            X = np.array(df[FEATURES].values) if ML_READY else np.array([])
-            y = np.array(df[var].values)
+            X = np.array(df_var[FEATURES].values) if ML_READY else np.array([])  # ← df_var
+            y = np.array(df_var[var].values)  # ← df_var
 
             # — Stacking metrics historis —
-            _X_sc     = np.array(scaler_X.transform(df[_dl_cols].values), dtype=np.float32)
+            _X_sc = np.array(scaler_X.transform(df_var[_dl_cols].values), dtype=np.float32)
             seqs_hist = np.array([_X_sc[i-STEP:i] for i in range(STEP, len(_X_sc))])
             stacked_preds = scaler_y.inverse_transform(
                 _lstm.predict(seqs_hist, verbose=0)
@@ -415,7 +428,7 @@ def _worker_generate_best(username: str) -> None:
 
             # — Future forecast —
             target_series  = df[var].tolist()
-            history_window = df.tail(STEP).copy().reset_index(drop=True)
+            history_window = df_var.tail(STEP).copy().reset_index(drop=True)
             future_rows    = []
             
             # ✅ Tambah ini sebelum loop TRAIN_VARS
@@ -493,6 +506,9 @@ def _worker_generate_best(username: str) -> None:
                     pred_stacked = float(np.clip(pred_stacked, lo, hi))
 
                 target_series.append(pred_stacked)
+                if var == "WD10M":
+                    last_row_dict["WD10M_sin"] = float(np.sin(np.deg2rad(pred_stacked)))
+                    last_row_dict["WD10M_cos"] = float(np.cos(np.deg2rad(pred_stacked)))
                 future_rows.append({
                     "YEAR":      int(next_time.year),
                     "MO":        int(next_time.month),
@@ -511,7 +527,10 @@ def _worker_generate_best(username: str) -> None:
 
             # — Best model per var untuk NLP —
             all_met = {**metrics_var, **metrics_dl_var}
-            best_name_var = min(all_met, key=lambda m: all_met[m]["sMAPE"]) if all_met else stacking_name
+            best_name_var = min(
+                all_met,
+                key=lambda m: all_met[m].get("primary_value", all_met[m].get("sMAPE", 999))
+            ) if all_met else stacking_name
             best_per_var[var] = (stacking_name, stacking_metrics)
 
             pm = stacking_metrics.get("primary_metric", "sMAPE")

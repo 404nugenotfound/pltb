@@ -46,16 +46,21 @@ def get_metrics_for_var(y_true, y_pred, var_name: str = "WS10M"):
         base["primary_value"]  = base["sMAPE"]
 
     elif var_name == "RH2M":
+        mae_pct = round((base["MAE"] / 100) * 100, 2)  # = MAE itu sendiri
+        base["MAE_pct"]        = mae_pct
         base["primary_metric"] = "MAE"
-        base["primary_value"]  = base["MAE"]
+        base["primary_value"] = round(float(base["MAE"]), 2)  # langsung % karena range 0-100
 
     elif var_name == "WD10M":
         diff = np.abs(yt - yp) % 360
         diff = np.where(diff > 180, 360 - diff, diff)
-        base["CircularMAE"]    = round(float(np.mean(diff)), 3)
+        circular_mae     = round(float(np.mean(diff)), 3)
+        circular_mae_pct = round((circular_mae / 360) * 100, 2)
+        base["CircularMAE"]    = circular_mae
+        base["CircularMAE_pct"] = circular_mae_pct
         base["primary_metric"] = "CircularMAE"
-        base["primary_value"]  = base["CircularMAE"]
-
+        base["primary_value"]  = circular_mae_pct  # dalam %
+        
     else:
         # fallback: pakai sMAPE
         denom = (np.abs(yt) + np.abs(yp)) / 2

@@ -15,7 +15,7 @@ def _flatten_to_test(metrics_dict: dict) -> dict:
     return result
 
 def get_metrics_cache_path():
-    return os.path.join(MODEL_FOLDER, "cache.json")
+    return os.path.join(MODEL_FOLDER, "metrics.json")
 
 def get_model_cache_dir(dataset_path: str = ""):
     if not dataset_path:
