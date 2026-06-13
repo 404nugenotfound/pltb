@@ -33,9 +33,10 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
             print(f"⚠️ Kolom {target_var} tidak ada, skip DL")
             return False
 
-        dl_cols  = [c for c in df.columns if c != target_var]
+        exclude = set(TRAIN_VARS)
+        dl_cols = [c for c in df.columns if c not in exclude]
         n_rows       = len(df)
-        split_train_rows = int(n_rows * 0.8)
+        split_scaler = int(n_rows * 0.8)
 
         X_all = df[dl_cols].values
         if target_var == "WD10M":
@@ -46,7 +47,7 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
             y_all = df[target_var].values.reshape(-1, 1)
 
         scaler_X = MinMaxScaler()
-        scaler_X.fit(X_all[:split_train_rows])
+        scaler_X.fit(X_all[:split_scaler])
         X_scaled = scaler_X.transform(X_all).astype(np.float32)
 
         if target_var == "WD10M":
@@ -54,7 +55,7 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
             y_scaled = y_all.astype(np.float32)
         else:
             scaler_y = MinMaxScaler()
-            scaler_y.fit(y_all[:split_train_rows])
+            scaler_y.fit(y_all[:split_scaler])
             y_scaled = scaler_y.transform(y_all).astype(np.float32)
 
         # ✅ Vectorized sequence building — jauh lebih cepat dari loop Python
@@ -76,7 +77,7 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
 
         es = EarlyStopping(
             monitor="val_loss",
-            patience=5,                # ✅ tetap 5 — cukup untuk 87K rows
+            patience=3,                # ✅ tetap 5 — cukup untuk 87K rows
             restore_best_weights=True,
             min_delta=0.0001           # ✅ BARU: abaikan improvement terlalu kecil
         )
@@ -91,7 +92,7 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
             model.fit(
                 X_train, y_train,
                 validation_data=(X_val, y_val),
-                epochs=30,             # ✅ naik dari 10 → 30, beri ruang konvergen
+                epochs=15,             # ✅ naik dari 10 → 15, beri ruang konvergen
                 batch_size=512,        # ✅ tetap 512, oke untuk 87K rows
                 callbacks=callbacks,
                 verbose=1
@@ -105,7 +106,7 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
         # =========================
         # LSTM — 2 layer
         lstm = Sequential([
-            KerasLSTM(76, return_sequences=True, input_shape=(STEP, n_feat)),
+            KerasLSTM(86, return_sequences=True, input_shape=(STEP, n_feat)),
             Dropout(0.2),
             KerasLSTM(64),
             Dropout(0.2),
@@ -132,7 +133,7 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
         callbacks = [
             EarlyStopping(
                 monitor="val_loss",
-                patience=5,            # ✅ tetap 5
+                patience=3,            # ✅ tetap 3 — cukup untuk 87K rows
                 restore_best_weights=True,
                 min_delta=0.0001       # ✅ BARU: sama seperti LSTM
             )
@@ -144,7 +145,7 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
         bilstm.fit(
             X_train, y_train,
             validation_data=(X_val, y_val),
-            epochs=30,                 # ✅ naik dari 10 → 30
+            epochs=15,                 # ✅ naik dari 10 → 15
             batch_size=512,            # ✅ tetap 512
             callbacks=callbacks,
             verbose=1
