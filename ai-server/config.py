@@ -8,7 +8,7 @@ ARCHIVE_FOLDER = "uploads/archive"
 ALLOWED_EXTENSIONS = {"csv"}
 
 TARGET = "WS10M"
-TRAIN_VARS = ["WS10M", "WD10M", "RH2M"]
+TRAIN_VARS = ["WS10M", "WD10M", "RH2M", "T2M", "PS"]
 
 
 DEFAULT_DATASET = "Dataset/NASA Bawean Hourly.csv"
@@ -24,7 +24,9 @@ REQUIRED_COLUMNS = [
     "HR",
     "WS10M",
     "WD10M",
-    "RH2M"
+    "RH2M",
+    "T2M",
+    "PS"
 ]
 
 STEP = 48

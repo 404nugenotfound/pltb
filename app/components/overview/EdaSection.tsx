@@ -30,6 +30,8 @@ const VAR_COLORS: Record<string, { bg: string; border: string; text: string; lin
   RH2M:  { bg: "bg-blue-50",   border: "border-blue-200",   text: "text-blue-700",   line: "#3b82f6" },
   WS10M: { bg: "bg-teal-50",   border: "border-teal-200",   text: "text-teal-700",   line: "#14b8a6" },
   WD10M: { bg: "bg-violet-50", border: "border-violet-200", text: "text-violet-700", line: "#8b5cf6" },
+  T2M:   { bg: "bg-orange-50", border: "border-orange-200", text: "text-orange-700", line: "#f97316" },
+  PS:    { bg: "bg-slate-50",  border: "border-slate-200",  text: "text-slate-700",  line: "#64748b" },
 };
 
 const STAT_LABELS = [

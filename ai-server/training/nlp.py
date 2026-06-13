@@ -61,6 +61,26 @@ VAR_LABELS = {
             )
         ),
     },
+    "T2M": {
+    "nama": "suhu udara",
+    "satuan": "°C",
+    "kategori": lambda avg: (
+        "sangat dingin" if avg < 18
+        else "sejuk" if avg < 24
+        else "nyaman" if avg < 28
+        else "panas" if avg < 33
+        else "sangat panas"
+    ),
+    },
+    "PS": {
+        "nama": "tekanan atmosfer",
+        "satuan": "kPa",
+        "kategori": lambda avg: (
+            "rendah" if avg < 99
+            else "normal" if avg < 103
+            else "tinggi"
+        ),
+    },
 }
 
 
@@ -176,6 +196,16 @@ def generate_nlp_report(stats: dict, best_model_name: str, best_met: dict) -> st
         konteks = (
             f"Arah angin dominan {stats['category']} ({avg:.1f}°), "
             f"penting untuk kalibrasi yaw control dan optimasi layout PLTB."
+        )
+    elif nama == "suhu udara":
+        konteks = (
+            f"Suhu udara rata-rata {avg:.1f}°C tergolong {stats['category']}. "
+            f"Suhu berpengaruh pada densitas udara yang mempengaruhi efisiensi turbin angin."
+        )
+    elif nama == "tekanan atmosfer":
+        konteks = (
+            f"Tekanan atmosfer rata-rata {avg:.2f} kPa tergolong {stats['category']}. "
+            f"Tekanan udara mempengaruhi densitas udara dan performa operasional turbin."
         )
     else:
         konteks = f"Nilai {nama} berada pada kisaran normal untuk wilayah pengamatan."

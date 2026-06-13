@@ -334,7 +334,7 @@ def eda_summary():
         path = get_active_dataset_path_for_user()
         df = pd.read_csv(path)
 
-        target_cols = [c for c in ["RH2M", "WS10M", "WD10M"] if c in df.columns]
+        target_cols = [c for c in ["RH2M", "WS10M", "WD10M", "T2M", "PS"] if c in df.columns]
 
         stats = {}
         for col in target_cols:

@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { useGenerateContext } from "@/app/context/GenerateContext";
 
 export default function ForecastingPage() {
-  const ALL_VARS = ["RH2M", "WS10M", "WD10M"];
+  const ALL_VARS = ["RH2M", "WS10M", "WD10M", "T2M", "PS"];  
 
   const [selectedModel, setSelectedModel] = useState("all");
   const [selectedVars, setSelectedVars]   = useState("WS10M");
@@ -130,7 +130,7 @@ export default function ForecastingPage() {
 
                   {/* VARIABEL */}
                   <div className={`flex items-center gap-2 overflow-hidden transition-all duration-600 ease-in-out ${
-                    selectedModel === "all" ? "max-w-xs opacity-100" : "max-w-0 opacity-0"
+                    selectedModel === "all" ? "max-w-xl opacity-100" : "max-w-0 opacity-0"
                   }`}>
                     <span className="text-xs text-gray-400 whitespace-nowrap">|</span>
                     {ALL_VARS.map((v) => (

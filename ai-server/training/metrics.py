@@ -61,6 +61,10 @@ def get_metrics_for_var(y_true, y_pred, var_name: str = "WS10M"):
         base["primary_metric"] = "CircularMAE"
         base["primary_value"]  = circular_mae_pct  # dalam %
         
+    elif var_name in ("T2M", "PS"):
+        base["primary_metric"] = "MAE"
+        base["primary_value"]  = round(float(base["MAE"]), 3)
+        
     else:
         # fallback: pakai sMAPE
         denom = (np.abs(yt) + np.abs(yp)) / 2
@@ -139,6 +143,13 @@ def compute_metrics_fresh(
     X_scaled, scaler_y, lstm, bilstm,
     var_name: str = "WS10M"
 ):
+    
+    def decode_dl(raw):
+        if var_name == "WD10M":
+            return np.rad2deg(np.arctan2(raw[:, 0], raw[:, 1])) % 360
+        else:
+            return scaler_y.inverse_transform(raw).flatten()
+        
     if not ML_READY:
         return {}, {}
     
@@ -179,8 +190,8 @@ def compute_metrics_fresh(
         y_dl_test  = y[split_val_dl:].reshape(-1, 1)
 
         for name, model in [("LSTM", lstm), ("BiLSTM", bilstm)]:
-            pred_train = scaler_y.inverse_transform(model.predict(seqs_train, verbose=0))
-            pred_test  = scaler_y.inverse_transform(model.predict(seqs_test,  verbose=0))
+            pred_train = decode_dl(model.predict(seqs_train, verbose=0)).reshape(-1, 1)
+            pred_test  = decode_dl(model.predict(seqs_test,  verbose=0)).reshape(-1, 1)
             dl[name] = {
                 "train": get_metrics_for_var(y_dl_train, pred_train, var_name),
                 "test":  get_metrics_for_var(y_dl_test,  pred_test,  var_name)

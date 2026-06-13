@@ -42,7 +42,13 @@ def init_dl_models(df_ref, target_var: str = None):
         bilstm = load_model(bilstm_path)
 
         scaler_X = joblib.load(scalerX_path)
-        scaler_y = joblib.load(scalery_path)
+        circular_path = os.path.join(MODEL_FOLDER, f"is_circular{suffix}.pkl")
+        is_circular = joblib.load(circular_path) if os.path.exists(circular_path) else False
+
+        if is_circular:
+            scaler_y = None
+        else:
+            scaler_y = joblib.load(scalery_path) if os.path.exists(scalery_path) else None
 
         # load dl_cols
         if dlcols_path and os.path.exists(dlcols_path):
@@ -52,13 +58,6 @@ def init_dl_models(df_ref, target_var: str = None):
         else:
             dl_cols = [c for c in df_ref.columns if c != target_var]
             
-        # Tambahkan ini ↓
-        DEFAULT_FILL = {"PS": 101.325}
-        for col, val in DEFAULT_FILL.items():
-            if col not in df_ref.columns:
-                df_ref = df_ref.copy()
-                df_ref[col] = val
-                print(f"⚠️ Kolom '{col}' tidak ada di df, diisi default {val}")
 
 
         missing = [c for c in dl_cols if c not in df_ref.columns]
@@ -82,6 +81,7 @@ def init_dl_models(df_ref, target_var: str = None):
             "bilstm": bilstm,
             "scaler_X": scaler_X,
             "scaler_y": scaler_y,
+            "is_circular": is_circular,
             "X_scaled": X_scaled,
             "data_seq": data_seq,
             "DL_INPUT_COLS": dl_cols,
@@ -96,6 +96,7 @@ def init_dl_models(df_ref, target_var: str = None):
             "bilstm": None,
             "scaler_X": None,
             "scaler_y": None,
+            "is_circular": False,
             "X_scaled": None,
             "data_seq": None,
             "DL_INPUT_COLS": [],

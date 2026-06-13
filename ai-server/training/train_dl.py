@@ -38,16 +38,24 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
         split_train_rows = int(n_rows * 0.8)
 
         X_all = df[dl_cols].values
-        y_all = df[target_var].values.reshape(-1, 1)
+        if target_var == "WD10M":
+            y_sin = np.sin(np.deg2rad(df[target_var].values))
+            y_cos = np.cos(np.deg2rad(df[target_var].values))
+            y_all = np.stack([y_sin, y_cos], axis=1)  # shape (n, 2)
+        else:
+            y_all = df[target_var].values.reshape(-1, 1)
 
         scaler_X = MinMaxScaler()
-        scaler_y = MinMaxScaler()
+        scaler_X.fit(X_all[:split_train_rows])
+        X_scaled = scaler_X.transform(X_all).astype(np.float32)
 
-        scaler_X.fit(X_all[:split_train_rows])  # ← fit di 80% saja
-        scaler_y.fit(y_all[:split_train_rows])  # ← fit di 80% saja
-
-        X_scaled = scaler_X.transform(X_all).astype(np.float32)  # ← transform semua
-        y_scaled = scaler_y.transform(y_all).astype(np.float32)  # ← transform semua
+        if target_var == "WD10M":
+            scaler_y = None
+            y_scaled = y_all.astype(np.float32)
+        else:
+            scaler_y = MinMaxScaler()
+            scaler_y.fit(y_all[:split_train_rows])
+            y_scaled = scaler_y.transform(y_all).astype(np.float32)
 
         # ✅ Vectorized sequence building — jauh lebih cepat dari loop Python
         n        = len(X_scaled)
@@ -56,6 +64,7 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
         targets  = y_scaled[STEP:]
 
         n_feat = seqs.shape[2]
+        n_out  = 2 if target_var == "WD10M" else 1 
         suffix = f"_{target_var}"
 
         # ✅ Split train/val manual — lebih efisien dari validation_split
@@ -92,14 +101,16 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
 
         # =========================
         # LSTM
-        # ✅ Diperkuat: n_feat ~26 + STEP=48, layer lama terlalu kecil
+        # ✅ Diperkuat: n_feat ~26 + STEP=48, 2 layer
         # =========================
+        # LSTM — 2 layer
         lstm = Sequential([
-            KerasLSTM(64, return_sequences=True, input_shape=(STEP, n_feat)),  # 32 → 64
-            KerasLSTM(32),                                                      # 16 → 32
+            KerasLSTM(76, return_sequences=True, input_shape=(STEP, n_feat)),
             Dropout(0.2),
-            Dense(16, activation="relu"),                                       # 8 → 16
-            Dense(1)
+            KerasLSTM(64),
+            Dropout(0.2),
+            Dense(16, activation="relu"),
+            Dense(n_out)
         ])
         build_and_train(lstm, "lstm")
 
@@ -109,11 +120,12 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
         # =========================
         # BiLSTM
         # =========================
+        # BiLSTM — tetap seperti sekarang, ga diubah
         bilstm = Sequential([
             Bidirectional(KerasLSTM(32, input_shape=(STEP, n_feat))),
-            Dropout(0.3),              # ✅ naik dari 0.2 → 0.3, kurangi gap MAE
+            Dropout(0.3),
             Dense(8, activation="relu"),
-            Dense(1)
+            Dense(n_out)
         ])
 
         # ✅ Reload callbacks karena clear_session
@@ -142,7 +154,9 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
 
         # ✅ Simpan scaler dan dl_cols
         joblib.dump(scaler_X, f"{MODEL_FOLDER}/scaler_X{suffix}.pkl")
-        joblib.dump(scaler_y, f"{MODEL_FOLDER}/scaler_y{suffix}.pkl")
+        if scaler_y is not None:
+            joblib.dump(scaler_y, f"{MODEL_FOLDER}/scaler_y{suffix}.pkl")
+        joblib.dump(target_var == "WD10M", f"{MODEL_FOLDER}/is_circular{suffix}.pkl")
         joblib.dump(dl_cols,  f"{MODEL_FOLDER}/dl_cols{suffix}.pkl")
 
         print(f"✅ DL training selesai untuk {target_var}")

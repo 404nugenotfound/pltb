@@ -1,8 +1,11 @@
 interface MetricItem {
   MAE: number;
   RMSE: number;
-  sMAPE: number;
+  sMAPE?: number;
   R2: number;
+  primary_metric?: string;
+  primary_value?: number;
+  CircularMAE?: number;
 }
 
 interface EnsembleVar {
@@ -33,7 +36,6 @@ export default function MetricsSection({
   stackingMetrics = {},
   ensembleSummary = {}, // ← tambah
 }: MetricsSectionProps) {
-
   // ========================
   // BEST 2 MODEL VIEW
   // ========================
@@ -59,9 +61,9 @@ export default function MetricsSection({
                 </p>
 
                 {/* Alur: Best ML + Best DL → Ensemble */}
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-4">
                   {/* Best ML */}
-                  <div className="flex-1 bg-white border border-amber-200 rounded-lg px-3 py-2 text-center">
+                  <div className="flex-1 bg-white border border-amber-200 rounded-lg px-1 py-2 text-center">
                     <p className="text-xs text-gray-400 mb-1">Best ML</p>
                     <p className="font-bold text-sm text-teal-700">{data.ml}</p>
                   </div>
@@ -70,7 +72,7 @@ export default function MetricsSection({
                   <span className="text-amber-400 font-bold text-lg">+</span>
 
                   {/* Best DL */}
-                  <div className="flex-1 bg-white border border-amber-200 rounded-lg px-3 py-2 text-center">
+                  <div className="flex-1 bg-white border border-amber-200 rounded-lg px-1 py-2 text-center">
                     <p className="text-xs text-gray-400 mb-1">Best DL</p>
                     <p className="font-bold text-sm text-teal-700">{data.dl}</p>
                   </div>
@@ -79,19 +81,23 @@ export default function MetricsSection({
                   <span className="text-amber-400 font-bold text-lg">→</span>
 
                   {/* Ensemble */}
-                  <div className="flex-1 bg-amber-100 border border-amber-300 rounded-lg px-3 py-2 text-center">
+                  <div className="flex-1 bg-amber-100 border border-amber-300 rounded-lg px-1 py-2 text-center">
                     <p className="text-xs text-gray-400 mb-1">Ensemble</p>
-                    <p className="font-bold text-sm text-amber-700">{data.ensemble}</p>
+                    <p className="font-bold text-sm text-amber-700">
+                      {data.ensemble}
+                    </p>
                   </div>
 
                   {/* sMAPE kalau ada */}
-                  {data.metrics?.sMAPE !== undefined && (
+                  {data.metrics?.primary_metric !== undefined && (
                     <>
                       <span className="text-gray-300 font-bold text-lg">|</span>
                       <div className="text-center min-w-15">
-                        <p className="text-xs text-gray-400 mb-1">sMAPE</p>
+                        <p className="text-xs text-gray-400 mb-1">
+                          {data.metrics.primary_metric}
+                        </p>
                         <p className="font-bold text-sm text-gray-700">
-                          {data.metrics.sMAPE}%
+                          {data.metrics.primary_value}%
                         </p>
                       </div>
                     </>
@@ -106,10 +112,10 @@ export default function MetricsSection({
 
     // ── Fallback lama kalau ensembleSummary kosong ──
     const bestCards = [
-      { label: "XGB",          data: stackingMetrics.xgb      ?? metrics["XGB"] },
-      { label: "LSTM",         data: stackingMetrics.Lstm      ?? metrics["LSTM"] },
-      { label: "Bi-LSTM",      data: stackingMetrics.biLstm    ?? metrics["BiLSTM"] },
-      { label: "XGB + LSTM",   data: stackingMetrics.xgbLstm },
+      { label: "XGB", data: stackingMetrics.xgb ?? metrics["XGB"] },
+      { label: "LSTM", data: stackingMetrics.Lstm ?? metrics["LSTM"] },
+      { label: "Bi-LSTM", data: stackingMetrics.biLstm ?? metrics["BiLSTM"] },
+      { label: "XGB + LSTM", data: stackingMetrics.xgbLstm },
       { label: "XGB + BiLSTM", data: stackingMetrics.xgbBiLstm },
     ];
 
@@ -122,14 +128,27 @@ export default function MetricsSection({
           {bestCards.map(({ label, data }) => {
             if (!data) return null;
             return (
-              <div key={label} className="border rounded-xl p-4 bg-amber-50 border-amber-300">
-                <p className="font-bold text-base text-amber-700 mb-3">{label}</p>
+              <div
+                key={label}
+                className="border rounded-xl p-4 bg-amber-50 border-amber-300"
+              >
+                <p className="font-bold text-base text-amber-700 mb-3">
+                  {label}
+                </p>
                 <div className="space-y-1.5 text-xs text-gray-600">
                   {(["MAE", "RMSE", "sMAPE", "R2"] as const).map((key) => (
                     <div key={key} className="flex justify-between">
-                      <span>{key === "R2" ? "R²" : key}</span>
+                      <span>
+                        {key === "R2"
+                          ? "R²"
+                          : key === "sMAPE"
+                            ? (data.primary_metric ?? "sMAPE")
+                            : key}
+                      </span>
                       <span className="font-semibold text-gray-800">
-                        {key === "sMAPE" ? `${data[key]}%` : data[key]}
+                        {key === "sMAPE"
+                          ? `${data.primary_value ?? data.sMAPE ?? "-"}%`
+                          : data[key as keyof MetricItem]}
                       </span>
                     </div>
                   ))}
@@ -164,18 +183,29 @@ export default function MetricsSection({
                 !isBest ? "opacity-30 grayscale" : ""
               } ${isBest ? "bg-amber-50 border-amber-300" : "bg-gray-50 border-gray-200"}`}
             >
-              <p className={`font-bold text-base mb-3 ${isBest ? "text-amber-700" : "text-teal-700"}`}>
+              <p
+                className={`font-bold text-base mb-3 ${isBest ? "text-amber-700" : "text-teal-700"}`}
+              >
                 {model}
               </p>
               <div className="space-y-1.5 text-xs text-gray-600">
-                {(["MAE", "RMSE", "sMAPE", "R2"] as const).map((key) => (
+                {(["MAE", "RMSE", "R2"] as const).map((key) => (
                   <div key={key} className="flex justify-between">
                     <span>{key === "R2" ? "R²" : key}</span>
                     <span className="font-semibold text-gray-800">
-                      {key === "sMAPE" ? `${m[key]}%` : m[key]}
+                      {m[key]}
                     </span>
                   </div>
                 ))}
+                {/* Primary metric row — sMAPE / CircularMAE / MAE% */}
+                {m.primary_metric && m.primary_metric !== "MAE" && (
+                  <div className="flex justify-between">
+                    <span>{m.primary_metric}</span>
+                    <span className="font-semibold text-gray-800">
+                      {m.primary_value}%
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           );
@@ -193,18 +223,29 @@ export default function MetricsSection({
                 !isBest ? "opacity-30 grayscale" : ""
               } ${isBest ? "bg-amber-50 border-amber-300" : "bg-gray-50 border-gray-200"}`}
             >
-              <p className={`font-bold text-base mb-3 ${isBest ? "text-amber-700" : "text-teal-700"}`}>
+              <p
+                className={`font-bold text-base mb-3 ${isBest ? "text-amber-700" : "text-teal-700"}`}
+              >
                 {model}
               </p>
               <div className="space-y-1.5 text-xs text-gray-600">
-                {(["MAE", "RMSE", "sMAPE", "R2"] as const).map((key) => (
+                {(["MAE", "RMSE", "R2"] as const).map((key) => (
                   <div key={key} className="flex justify-between">
                     <span>{key === "R2" ? "R²" : key}</span>
                     <span className="font-semibold text-gray-800">
-                      {key === "sMAPE" ? `${m[key]}%` : m[key]}
+                      {m[key]}
                     </span>
                   </div>
                 ))}
+                {/* Primary metric row — sMAPE / CircularMAE / MAE% */}
+                {m.primary_metric && m.primary_metric !== "MAE" && (
+                  <div className="flex justify-between">
+                    <span>{m.primary_metric}</span>
+                    <span className="font-semibold text-gray-800">
+                      {m.primary_value}%
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           );

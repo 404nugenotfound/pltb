@@ -201,6 +201,8 @@ export default function ForecastChart({
             <option value="WS10M">WS10M</option>
             <option value="WD10M">WD10M</option>
             <option value="RH2M">RH2M</option>
+            <option value="T2M">T2M</option>
+            <option value="PS">PS</option>
           </select>
         )}
       </div>
