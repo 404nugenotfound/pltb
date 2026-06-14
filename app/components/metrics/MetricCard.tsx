@@ -18,15 +18,9 @@ export default function MetricCard({
   return (
     <div
       className={`border rounded-xl p-4 transition-all
+        ${selectedModel === "best" && !isBest ? "opacity-30 grayscale" : ""}
         ${
-          selectedModel === "best" && !isBest
-            ? "opacity-30 grayscale"
-            : ""
-        }
-        ${
-          isBest
-            ? "bg-amber-50 border-amber-300"
-            : "bg-gray-50 border-gray-200"
+          isBest ? "bg-amber-50 border-amber-300" : "bg-gray-50 border-gray-200"
         }
       `}
     >
@@ -55,39 +49,38 @@ export default function MetricCard({
       <div className="space-y-1.5 text-xs text-gray-600">
         <div className="flex justify-between">
           <span>MAE</span>
-          <span className="font-semibold text-gray-800">
-            {metric.MAE}
-          </span>
+          <span className="font-semibold text-gray-800">{metric.MAE}</span>
         </div>
 
         <div className="flex justify-between">
           <span>RMSE</span>
-          <span className="font-semibold text-gray-800">
-            {metric.RMSE}
-          </span>
+          <span className="font-semibold text-gray-800">{metric.RMSE}</span>
         </div>
 
-        <div className="flex justify-between">
-          <span>MAPE</span>
-
-          <span
-            className={`font-semibold ${
-              rank === 1
-                ? "text-amber-600"
-                : rank === 2
-                ? "text-orange-500"
-                : "text-gray-800"
-            }`}
-          >
-            {metric.MAPE}%
-          </span>
-        </div>
+        {/* Primary metric — dinamis per variabel */}
+        {metric.primary_metric === "CircularMAE" ? (
+          <div className="flex justify-between">
+            <span>CircularMAE</span>
+            <span
+              className={`font-semibold ${rank === 1 ? "text-amber-600" : rank === 2 ? "text-orange-500" : "text-gray-800"}`}
+            >
+              {metric.CircularMAE}° ({metric.CircularMAE_pct}%)
+            </span>
+          </div>
+        ) : metric.primary_metric === "MAE" ? null : (
+          <div className="flex justify-between">
+            <span>sMAPE</span>
+            <span
+              className={`font-semibold ${rank === 1 ? "text-amber-600" : rank === 2 ? "text-orange-500" : "text-gray-800"}`}
+            >
+              {metric.sMAPE}%
+            </span>
+          </div>
+        )}
 
         <div className="flex justify-between">
           <span>R²</span>
-          <span className="font-semibold text-gray-800">
-            {metric.R2}
-          </span>
+          <span className="font-semibold text-gray-800">{metric.R2}</span>
         </div>
       </div>
     </div>

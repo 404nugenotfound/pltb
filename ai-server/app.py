@@ -25,10 +25,6 @@ from routes.cache_settings import (
 # =========================
 from utils.dataset import *
 
-from utils.cache import (
-    load_or_compute_metrics
-)
-
 # =========================
 # FEATURE ENGINEERING
 # =========================
@@ -122,28 +118,13 @@ X_scaled      = dl_state["X_scaled"]
 data_seq      = dl_state["data_seq"]
 DL_INPUT_COLS = dl_state["DL_INPUT_COLS"]
 DL_READY      = dl_state["DL_READY"]
-print(f"✅ DL Ready: {DL_READY}")
+is_circular = dl_state.get("is_circular", False)
 
 # =========================
 # LOAD METRICS
 # =========================
-metrics, metrics_dl = (
-    load_or_compute_metrics(
-        ML_READY,
-        DL_READY,
-        gbr,
-        xgb,
-        knn,
-        scaler,
-        X,
-        y,
-        X_scaled,
-        scaler_y,
-        lstm,
-        bilstm,
-        var_name=TARGET
-    )
-)
+metrics    = {}
+metrics_dl = {}
 
 print(
     f"✅ Metrics loaded | "

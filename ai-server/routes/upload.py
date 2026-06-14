@@ -18,20 +18,13 @@ from utils.progress import *
 
 from training.worker_retrain import worker_retrain
 
-
-upload_bp = Blueprint(
-    "upload",
-    __name__
-)
+upload_bp = Blueprint("upload", __name__)
 
 
 # =========================
 # UPLOAD DATASET
 # =========================
-@upload_bp.route(
-    "/upload_dataset",
-    methods=["POST"]
-)
+@upload_bp.route("/upload_dataset", methods=["POST"])
 def upload_dataset():
 
     username = session.get("username")
@@ -40,23 +33,17 @@ def upload_dataset():
 
         if train_progress.get(username, {}).get("running"):
 
-            return jsonify({
-                "status": "error",
-                "message": "Training sedang berjalan"
-            }), 409
-            
+            return (
+                jsonify({"status": "error", "message": "Training sedang berjalan"}),
+                409,
+            )
+
     # =========================
     # VALIDASI FILE
     # =========================
     if "dataset" not in request.files:
 
-        return jsonify({
-
-            "status": "error",
-
-            "message": "Tidak ada dataset"
-
-        }), 400
+        return jsonify({"status": "error", "message": "Tidak ada dataset"}), 400
 
     file = request.files["dataset"]
 
@@ -64,112 +51,81 @@ def upload_dataset():
 
     if raw_filename == "":
 
-        return jsonify({
-
-            "status": "error",
-
-            "message": "Filename kosong"
-
-        }), 400
+        return jsonify({"status": "error", "message": "Filename kosong"}), 400
 
     if not allowed_file(raw_filename):
 
-        return jsonify({
-
-            "status": "error",
-
-            "message": "File harus CSV"
-
-        }), 400
+        return jsonify({"status": "error", "message": "File harus CSV"}), 400
 
     # =========================
     # SAVE TEMP FILE
     # =========================
-    filename = secure_filename(
-        raw_filename
-    )
+    filename = secure_filename(raw_filename)
 
-    pending_path = os.path.join(
-        UPLOAD_FOLDER,
-        f"pending_{filename}"
-    )
+    pending_path = os.path.join(UPLOAD_FOLDER, f"pending_{filename}")
 
     file.save(pending_path)
 
     # =========================
     # VALIDATE CSV
     # =========================
-    validation = validate_csv(
-        pending_path
-    )
+    validation = validate_csv(pending_path)
 
     if not validation["valid"]:
 
         os.remove(pending_path)
 
-        return jsonify({
-
-            "status": "invalid",
-
-            "errors": validation["errors"],
-
-            "info": validation["info"]
-
-        }), 422
+        return (
+            jsonify(
+                {
+                    "status": "invalid",
+                    "errors": validation["errors"],
+                    "info": validation["info"],
+                }
+            ),
+            422,
+        )
 
     # =========================
     # FINAL SAVE
     # =========================
-    final_path = os.path.join(
-        UPLOAD_FOLDER,
-        filename
-    )
+    final_path = os.path.join(UPLOAD_FOLDER, filename)
 
-    shutil.move(
-        pending_path,
-        final_path
-    )
+    shutil.move(pending_path, final_path)
 
-    set_active_dataset_path_for_user(
-        final_path
-    )
+    set_active_dataset_path_for_user(final_path)
 
     # =========================
     # CHECK CACHE TRAIN
     # =========================
-    from utils.cache_settings import (
-        get_cache_settings
-    )
+    from utils.cache_settings import get_cache_settings
 
     settings = get_cache_settings()
-    
-    already_trained, file_hash = (
-        is_dataset_already_trained(
-            final_path
-        )
-    )
+
+    already_trained, file_hash = is_dataset_already_trained(final_path, username)
 
     if settings["model_cache"] and already_trained:
-        snap_dir = get_model_dir_for_hash(file_hash)
-        registry = load_model_registry()
+        snap_dir = get_model_dir_for_user(username)
+        registry = load_model_registry(username)
         entry = registry.get(file_hash, {})
 
         if os.path.exists(snap_dir):
             for fname in os.listdir(snap_dir):
                 shutil.copy2(
-                    os.path.join(snap_dir, fname),
-                    os.path.join(MODEL_FOLDER, fname)
+                    os.path.join(snap_dir, fname), os.path.join(MODEL_FOLDER, fname)
                 )
 
-        set_active_dataset_path_for_user(final_path)
-
-        return jsonify({
-            "status": "skipped",
-            "filename": filename,
-            "message": "Dataset sudah pernah di-train",
-            "trained_at": entry.get("trained_at", "")
-        })
+        reload_all_globals(final_path, username=username)  # ← TAMBAH INI
         
+        return jsonify(
+            {
+                "status": "skipped",
+                "filename": filename,
+                "message": "Dataset sudah pernah di-train",
+                "trained_at": entry.get("trained_at", ""),
+            }
+        )
+
     # =========================
     # START TRAIN
     # =========================
@@ -180,26 +136,20 @@ def upload_dataset():
             "done": False,
             "error": None,
             "log": [],
-            "cancel": False
+            "cancel": False,
         }
 
     threading.Thread(
         target=worker_retrain,
-        args=(
-            username,
-            final_path,
-            train_progress,
-            train_lock
-        ),
-        daemon=True
+        args=(username, final_path, train_progress, train_lock),
+        daemon=True,
     ).start()
 
-    return jsonify({
-        "status": "started",
-        "filename": filename,
-        "message": "Training dimulai"
-    })
-    
+    return jsonify(
+        {"status": "started", "filename": filename, "message": "Training dimulai"}
+    )
+
+
 # =========================
 # TRAIN PROGRESS
 # =========================
@@ -218,19 +168,17 @@ def get_train_progress():
                 "done": False,
                 "cancelled": False,
                 "error": None,
-                "log": []
-            }
+                "log": [],
+            },
         )
 
     return jsonify(p)
 
+
 # =========================
 # CANCEL TRAINING
 # =========================
-@upload_bp.route(
-    "/cancel_training",
-    methods=["POST"]
-)
+@upload_bp.route("/cancel_training", methods=["POST"])
 def cancel_training():
 
     username = session.get("username")
@@ -241,83 +189,54 @@ def cancel_training():
 
             train_progress[username]["cancel"] = True
 
-    return jsonify({
-        "status": "cancel_requested"
-    })
- 
+    return jsonify({"status": "cancel_requested"})
+
+
 # =========================
 # CLEAR TRAIN PROGRESS
 # =========================
-@upload_bp.route(
-    "/clear_train_progress",
-    methods=["POST"]
-)
+@upload_bp.route("/clear_train_progress", methods=["POST"])
 def clear_train_progress():
 
     username = session.get("username")
 
     with train_lock:
 
-        train_progress.pop(
-            username,
-            None
-        )
+        train_progress.pop(username, None)
 
-    return jsonify({
-        "status": "cleared"
-    })
- 
+    return jsonify({"status": "cleared"})
+
+
 # =========================
 # CANCEL UPLOAD
 # =========================
-@upload_bp.route(
-    "/cancel_upload",
-    methods=["POST"]
-)
+@upload_bp.route("/cancel_upload", methods=["POST"])
 def cancel_upload():
 
-    pending_path = session.pop(
-        "pending_dataset",
-        None
-    )
+    pending_path = session.pop("pending_dataset", None)
 
-    if (
-        pending_path
-        and os.path.exists(pending_path)
-    ):
+    if pending_path and os.path.exists(pending_path):
 
         os.remove(pending_path)
 
-    return jsonify({
-
-        "status": "cancelled"
-
-    })
+    return jsonify({"status": "cancelled"})
 
 
 # =========================
 # DATASET INFO
 # =========================
-@upload_bp.route(
-    "/dataset_info"
-)
+@upload_bp.route("/dataset_info")
 def dataset_info():
 
-    return jsonify({
+    return jsonify(
+        {
+            "filename": os.path.basename(get_active_dataset_path_for_user()),
+            "rows": 0,
+            "is_custom": get_active_dataset_path_for_user() != DEFAULT_DATASET,
+        }
+    )
 
-        "filename":
-            os.path.basename(
-                get_active_dataset_path_for_user()
-            ),
 
-        "rows": 0,
-
-        "is_custom":
-            get_active_dataset_path()
-            != DEFAULT_DATASET
-
-    })
-    
 # =========================
 # DOWNLOAD TEMPLATE
 # =========================
@@ -325,7 +244,5 @@ def dataset_info():
 def download_template():
     path = os.path.join("Dataset", "NASA Bawean Hourly.csv")
     return send_file(
-        os.path.abspath(path),
-        as_attachment=True,
-        download_name="template_dataset.csv"
+        os.path.abspath(path), as_attachment=True, download_name="template_dataset.csv"
     )

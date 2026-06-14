@@ -15,12 +15,7 @@ from utils.reload_state import reload_all_globals
 from utils.cache import load_or_compute_metrics
 
 
-def worker_retrain(
-    username,
-    dataset_path,
-    train_progress,
-    train_lock
-):
+def worker_retrain(username, dataset_path, train_progress, train_lock):
     def log(msg):
         print(msg)
         with train_lock:
@@ -50,7 +45,7 @@ def worker_retrain(
         # =========================
         # TRAIN ML — PER VARIABEL
         # =========================
-        lag_cols  = ["lag1", "lag2", "lag3", "lag24"]
+        lag_cols = ["lag1", "lag2", "lag3", "lag24"]
         roll_cols = ["mean3", "mean24"]
         time_cols = ["HR", "DY", "MO", "YEAR"]
 
@@ -68,12 +63,14 @@ def worker_retrain(
             df_var = load_and_engineer(dataset_path, target_var=var)
 
             extra_cols = [
-                c for c in df_var.columns
+                c
+                for c in df_var.columns
                 if c not in ([var] + lag_cols + roll_cols + time_cols)
                 and pd.api.types.is_numeric_dtype(df_var[c])
             ]
             features = [
-                f for f in (time_cols + extra_cols + lag_cols + roll_cols)
+                f
+                for f in (time_cols + extra_cols + lag_cols + roll_cols)
                 if f in df_var.columns
             ]
 
@@ -104,11 +101,7 @@ def worker_retrain(
             # ✅ DL pakai df_var yang sudah di-engineer per variabel
             df_var = load_and_engineer(dataset_path, target_var=var)
 
-            dl_ok = train_dl_models(
-                df_var,
-                target_var=var,
-                cancel_check=is_cancelled
-            )
+            dl_ok = train_dl_models(df_var, target_var=var, cancel_check=is_cancelled)
 
             if is_cancelled():
                 raise InterruptedError("Training dibatalkan user")
@@ -133,11 +126,15 @@ def worker_retrain(
                 df_var = load_and_engineer(dataset_path, target_var=var)
 
                 gbr_v, xgb_v, knn_v, scaler_v, feats_v = load_ml_models(f"_{var}")
-                ML_READY_V = all([
-                    gbr_v is not None, xgb_v is not None,
-                    knn_v is not None, scaler_v is not None,
-                    len(feats_v) > 0
-                ])
+                ML_READY_V = all(
+                    [
+                        gbr_v is not None,
+                        xgb_v is not None,
+                        knn_v is not None,
+                        scaler_v is not None,
+                        len(feats_v) > 0,
+                    ]
+                )
 
                 X_v = np.array(df_var[feats_v].values) if ML_READY_V else np.array([])
                 y_v = np.array(df_var[var].values)
@@ -146,16 +143,24 @@ def worker_retrain(
                 DL_READY_V = dl_state_v["DL_READY"]
                 X_scaled_v = dl_state_v["X_scaled"]
                 scaler_y_v = dl_state_v["scaler_y"]
-                lstm_v     = dl_state_v["lstm"]
-                bilstm_v   = dl_state_v["bilstm"]
+                lstm_v = dl_state_v["lstm"]
+                bilstm_v = dl_state_v["bilstm"]
 
                 ml_v, dl_v = load_or_compute_metrics(
-                    ML_READY_V, DL_READY_V,
-                    gbr_v, xgb_v, knn_v, scaler_v,
-                    X_v, y_v,
-                    X_scaled_v, scaler_y_v,
-                    lstm_v, bilstm_v,
-                    var_name=var
+                    ML_READY_V,
+                    DL_READY_V,
+                    gbr_v,
+                    xgb_v,
+                    knn_v,
+                    scaler_v,
+                    X_v,
+                    y_v,
+                    X_scaled_v,
+                    scaler_y_v,
+                    lstm_v,
+                    bilstm_v,
+                    var_name=var,
+                    username=username,
                 )
                 log(f"✅ Metrics [{var}] ML={list(ml_v.keys())} DL={list(dl_v.keys())}")
 
@@ -171,7 +176,7 @@ def worker_retrain(
 
         log("💾 Simpan registry...")
         file_hash = compute_file_hash(dataset_path)
-        snap_dir  = get_model_dir_for_hash(file_hash)
+        snap_dir = get_model_dir_for_user(username)
         os.makedirs(snap_dir, exist_ok=True)
 
         for fname in os.listdir(MODEL_FOLDER):
@@ -179,12 +184,7 @@ def worker_retrain(
             if os.path.isfile(src):
                 shutil.copy2(src, os.path.join(snap_dir, fname))
 
-        registry = load_model_registry(dataset_path)
-        registry[file_hash] = {
-            "trained_at": pd.Timestamp.now().isoformat(),
-            "dataset":    os.path.basename(dataset_path)
-        }
-        save_model_registry(registry, dataset_path)
+        save_model_registry(username, file_hash, dataset_path)
         log("✅ Registry disimpan")
 
         # =========================
@@ -194,7 +194,7 @@ def worker_retrain(
             raise InterruptedError("Training dibatalkan user")
 
         log("♻️ Reload globals...")
-        reload_all_globals(dataset_path)
+        reload_all_globals(dataset_path, username=username)
         log("✅ Reload selesai")
 
         # =========================
@@ -202,33 +202,39 @@ def worker_retrain(
         # =========================
         with train_lock:
             if username in train_progress:
-                train_progress[username].update({
-                    "running":   False,
-                    "done":      True,
-                    "cancelled": False,
-                    "error":     None,
-                    "step":      "Selesai"
-                })
+                train_progress[username].update(
+                    {
+                        "running": False,
+                        "done": True,
+                        "cancelled": False,
+                        "error": None,
+                        "step": "Selesai",
+                    }
+                )
 
     except InterruptedError:
         with train_lock:
             if username in train_progress:
-                train_progress[username].update({
-                    "running":   False,
-                    "done":      True,
-                    "cancelled": True,
-                    "error":     None,
-                    "step":      "Training dibatalkan"
-                })
+                train_progress[username].update(
+                    {
+                        "running": False,
+                        "done": True,
+                        "cancelled": True,
+                        "error": None,
+                        "step": "Training dibatalkan",
+                    }
+                )
 
     except Exception as e:
         print(traceback.format_exc())
         with train_lock:
             if username in train_progress:
-                train_progress[username].update({
-                    "running":   False,
-                    "done":      True,
-                    "cancelled": False,
-                    "error":     str(e),
-                    "step":      "Error"
-                })
+                train_progress[username].update(
+                    {
+                        "running": False,
+                        "done": True,
+                        "cancelled": False,
+                        "error": str(e),
+                        "step": "Error",
+                    }
+                )

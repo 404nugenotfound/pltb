@@ -140,7 +140,8 @@ def forecasting_data():
     from utils.user_helpers import load_user
     from training.metrics import (
         load_metrics_for_var,
-        load_dl_metrics_for_var
+        load_dl_metrics_for_var,
+        load_ensemble_components,
     )
     from config import TARGET
 
@@ -148,8 +149,8 @@ def forecasting_data():
     selected_var = request.args.get("var", TARGET)
 
     all_metrics = {}
-    all_metrics.update(load_metrics_for_var(selected_var))
-    all_metrics.update(load_dl_metrics_for_var(selected_var))
+    all_metrics.update(load_metrics_for_var(selected_var, username=username))
+    all_metrics.update(load_dl_metrics_for_var(selected_var, username=username))
 
     if not all_metrics:
         all_metrics = {
@@ -158,8 +159,8 @@ def forecasting_data():
         }
 
     best_model_names = get_best_ml_and_dl(
-        load_metrics_for_var(selected_var),
-        load_dl_metrics_for_var(selected_var)
+        load_metrics_for_var(selected_var, username=username),
+        load_dl_metrics_for_var(selected_var, username=username)
     )
 
     dataset_name = ""
@@ -175,19 +176,23 @@ def forecasting_data():
             get_active_dataset_path() or ""
         )
 
-    with progress_lock:
-        ensemble_summary = (
-            generate_progress
-            .get(username, {})
-            .get("ensemble_summary", {})
-        )
+    ensemble_components = load_ensemble_components(username=username)
+    ensemble_summary = {}
+    for var, components in ensemble_components.items():
+        if len(components) >= 2:
+            ml_name, dl_name = components[0], components[1]
+            ensemble_summary[var] = {
+                "ml":       ml_name,
+                "dl":       dl_name,
+                "ensemble": f"{ml_name} + {dl_name}",
+            }
 
     return jsonify({
-        "dataset_name": dataset_name,
-        "metrics": all_metrics,
-        "best_models": best_model_names,
-        "ensemble_summary": ensemble_summary
-    })   
+        "dataset_name":     dataset_name,
+        "metrics":          all_metrics,
+        "best_models":      best_model_names,
+        "ensemble_summary": ensemble_summary,
+    })
     
 # =========================
 # ANALITIK
@@ -297,11 +302,13 @@ def overfit_metrics():
     from training.metrics import load_metrics, load_ensemble_metrics, load_ensemble_components
     from config import TRAIN_VARS
 
+    username = request.headers.get("X-Username") or session.get("username")
+
     result = {}
 
     for var in TRAIN_VARS:
-        ml, dl = load_metrics(var)
-        ensemble = load_ensemble_metrics(var)
+        ml, dl = load_metrics(var, username=username)
+        ensemble = load_ensemble_metrics(var, username=username)
         combined = {**(ml or {}), **(dl or {}), **(ensemble or {})}
 
         var_result = {}
@@ -318,7 +325,7 @@ def overfit_metrics():
     if not result:
         return jsonify({"error": "Metrics belum tersedia. Silakan train model dulu."}), 404
 
-    ensemble_components = load_ensemble_components()
+    ensemble_components = load_ensemble_components(username=username)
 
     return jsonify({
         "metrics":             result,

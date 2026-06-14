@@ -62,23 +62,23 @@ VAR_LABELS = {
         ),
     },
     "T2M": {
-    "nama": "suhu udara",
-    "satuan": "°C",
-    "kategori": lambda avg: (
-        "sangat dingin" if avg < 18
-        else "sejuk" if avg < 24
-        else "nyaman" if avg < 28
-        else "panas" if avg < 33
-        else "sangat panas"
-    ),
+        "nama": "suhu udara",
+        "satuan": "°C",
+        "kategori": lambda avg: (
+            "sangat dingin"
+            if avg < 18
+            else (
+                "sejuk"
+                if avg < 24
+                else "nyaman" if avg < 28 else "panas" if avg < 33 else "sangat panas"
+            )
+        ),
     },
     "PS": {
         "nama": "tekanan atmosfer",
         "satuan": "kPa",
         "kategori": lambda avg: (
-            "rendah" if avg < 99
-            else "normal" if avg < 103
-            else "tinggi"
+            "rendah" if avg < 99 else "normal" if avg < 103 else "tinggi"
         ),
     },
 }
@@ -210,12 +210,42 @@ def generate_nlp_report(stats: dict, best_model_name: str, best_met: dict) -> st
     else:
         konteks = f"Nilai {nama} berada pada kisaran normal untuk wilayah pengamatan."
 
-    # Interpretasi R2
+    # Build performa string per variabel
     try:
         r2 = float(r2_raw)
         r2_interp = "sangat baik" if r2 >= 0.95 else "baik" if r2 >= 0.85 else "cukup"
     except:
         r2_interp = "tidak tersedia"
+
+    if nama == "arah angin":
+        circular_mae = str(best_met.get("CircularMAE", "N/A"))
+        circular_mae_pct = str(best_met.get("CircularMAE_pct", "N/A"))
+        performa_str = (
+            f"CircularMAE **{circular_mae}°** ({circular_mae_pct}%), "
+            f"RMSE {rmse_str} {satuan}, R² {r2_str} ({r2_interp})"
+        )
+        akurasi_val = best_met.get("CircularMAE_pct", 999)
+        try:
+            akurasi = (
+                "tinggi"
+                if float(akurasi_val) < 5
+                else "cukup" if float(akurasi_val) < 15 else "rendah"
+            )
+        except:
+            akurasi = "tidak tersedia"
+    elif nama == "tekanan atmosfer" or nama == "suhu udara" or nama == "kelembaban udara":
+        performa_str = (
+            f"MAE {mae_str} {satuan}, RMSE {rmse_str} {satuan}, R² {r2_str} ({r2_interp})"
+        )
+        try:
+            akurasi = "tinggi" if float(mae_raw) < 2 else "cukup" if float(mae_raw) < 5 else "rendah"
+        except:
+            akurasi = "tidak tersedia"
+    else:
+        performa_str = (
+            f"MAE {mae_str} {satuan}, RMSE {rmse_str} {satuan}, "
+            f"sMAPE {smape_str}, R² {r2_str} ({r2_interp})"
+        )
 
     return (
         f"Ringkasan prediksi {nama} untuk periode "
@@ -235,7 +265,7 @@ def generate_nlp_report(stats: dict, best_model_name: str, best_met: dict) -> st
         f"yang dapat mempengaruhi kinerja sistem.\n"
         f"\n"
         f"▸ Performa model: {best_model_name} — "
-        f"MAE {mae_str} {satuan}, RMSE {rmse_str} {satuan}, sMAPE {smape_str}, R² {r2_str} ({r2_interp}). "
+        f"{performa_str}. "
         f"Model mampu menjelaskan variasi data dengan kemampuan {r2_interp}. "
         f"Akurasi keseluruhan tergolong {akurasi}."
     )
@@ -282,7 +312,11 @@ def generate_nlp_report_best(
         else:
             pv = float(pv_raw)
             pv_str = f"{pv:.2f}%"
-            akurasi = "tinggi" if pv < 10 else "cukup" if pv < 20 else "rendah"
+            # ← fix threshold per primary metric
+            if pm == "CircularMAE":
+                akurasi = "tinggi" if pv < 5 else "cukup" if pv < 15 else "rendah"
+            else:
+                akurasi = "tinggi" if pv < 10 else "cukup" if pv < 20 else "rendah"
             mape_list.append(pv)
 
         rmse_str = "N/A" if rmse_raw.lower() in ("-", "", "nan", "none") else rmse_raw
@@ -306,7 +340,8 @@ def generate_nlp_report_best(
         avg_akurasi = "tinggi" if avg_pv < 10 else "cukup" if avg_pv < 20 else "rendah"
         lines.append(
             f"\nRata-rata error keseluruhan: **{avg_pv:.2f}%** "
-            f"— tingkat akurasi prediksi tergolong **{avg_akurasi}**."
+            f"— tingkat akurasi prediksi tergolong **{avg_akurasi}** "
+            f"(CircularMAE untuk arah angin, MAE/sMAPE untuk variabel lain)."
         )
 
     return "\n".join(lines)

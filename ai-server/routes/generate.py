@@ -83,12 +83,8 @@ def generate_commit():
 # BACKGROUND WORKER — GENERATE FULL
 # =========================
 def _worker_generate_full(
-    username: str,
-    selected_model: str,
-    active_models: list,
-    output_mode: str = "general",
-    selected_var: str = "WS10M",
-) -> None:
+    username, selected_model, active_models, output_mode, selected_var, dataset_path
+):
 
     from app import df
     from training.load_ml import load_ml_for_var
@@ -109,7 +105,7 @@ def _worker_generate_full(
     )
 
     # ✅ Bug 3 fix — pakai df_var yang udah di-engineer
-    df_var = load_and_engineer(get_active_dataset_path(), target_var=selected_var)
+    df_var = load_and_engineer(dataset_path, target_var=selected_var)
     X = np.array(df_var[FEATURES].values) if ML_READY else np.array([])
 
     dl_state = load_dl_for_var(df_var, selected_var)
@@ -129,8 +125,8 @@ def _worker_generate_full(
             return scaler_y.inverse_transform(raw).flatten()
 
     # ✅ Load metrics per variabel
-    metrics = load_metrics_for_var(selected_var)
-    metrics_dl = load_dl_metrics_for_var(selected_var)
+    metrics = load_metrics_for_var(selected_var, username=username)
+    metrics_dl = load_dl_metrics_for_var(selected_var, username=username)
 
     print("=" * 50)
     print("🚀 WORKER FULL START")
@@ -375,7 +371,7 @@ def _worker_generate_full(
 
         with open(output_path, "w", encoding="utf-8-sig", newline="") as f:
             f.write("-BEGIN HEADER-\n")
-            f.write(f"Dataset: {os.path.basename(get_active_dataset_path())}\n")
+            f.write(f"Dataset: {os.path.basename(dataset_path)}\n")
             f.write(f"Variabel: {selected_var}\n")
             f.write(f"Forecast Summary:\n{nlp_report}\n\n-END HEADER-\n\n")
             df_out.to_csv(f, index=False, sep=";")
@@ -402,7 +398,7 @@ def _worker_generate_full(
 # =========================
 # BACKGROUND WORKER — GENERATE BEST
 # =========================
-def _worker_generate_best(username: str) -> None:
+def _worker_generate_best(username: str, dataset_path: str) -> None:
     from app import df
     from training.load_ml import load_ml_for_var
     from training.load_dl import load_dl_for_var
@@ -444,7 +440,7 @@ def _worker_generate_best(username: str) -> None:
             print(f"{'='*50}")
 
             gbr, xgb, knn, scaler, FEATURES = load_ml_for_var(var)
-            df_var = load_and_engineer(get_active_dataset_path(), target_var=var)
+            df_var = load_and_engineer(dataset_path, target_var=var)
             dl_state = load_dl_for_var(df_var, var)
             DL_READY = dl_state["DL_READY"]
             scaler_X = dl_state["scaler_X"]
@@ -463,8 +459,8 @@ def _worker_generate_best(username: str) -> None:
                 print(f"⚠️ DL {var} tidak siap, skip")
                 continue
 
-            metrics_var = load_metrics_for_var(var)
-            metrics_dl_var = load_dl_metrics_for_var(var)
+            metrics_var = load_metrics_for_var(var, username=username)
+            metrics_dl_var = load_dl_metrics_for_var(var, username=username)
 
             best_dl_name = (
                 min(
@@ -526,7 +522,7 @@ def _worker_generate_best(username: str) -> None:
 
             from training.metrics import save_ensemble_metrics
 
-            save_ensemble_metrics(var, "XGB", best_dl_name, stacking_metrics)
+            save_ensemble_metrics(var, "XGB", best_dl_name, stacking_metrics, username=username)
 
             ensemble_summary[var] = {
                 "ml": "XGB",
@@ -640,6 +636,10 @@ def _worker_generate_best(username: str) -> None:
                     if "WD10M_cos" in new_row.index:
                         new_row["WD10M_cos"] = float(np.cos(np.deg2rad(pred_xgb)))
 
+                if "T2M" in new_row.index:
+                    same_hour = df[df["HR"] == next_time.hour]["T2M"].mean()
+                    new_row["T2M"] = float(same_hour)
+
                 history_window = pd.concat(
                     [history_window.iloc[1:], pd.DataFrame([new_row])],
                     ignore_index=True,
@@ -691,10 +691,13 @@ def _worker_generate_best(username: str) -> None:
             pv = stacking_metrics.get(
                 "primary_value", stacking_metrics.get("sMAPE", "?")
             )
+            unit = "°" if pm == "CircularMAE" or pm == "CircularRMSE" else "%" if pm in ("sMAPE", "MAE_pct", "CircularMAE_pct") else ""
             stacking_info.append(
                 f"{var} | Model: {stacking_name} | "
-                f"MAE={stacking_metrics['MAE']} RMSE={stacking_metrics['RMSE']} "
-                f"{pm}={pv}{'°' if pm == 'CircularMAE' else '%' if pm == 'sMAPE' else ''} R2={stacking_metrics['R2']}"
+                f"MAE={stacking_metrics.get('MAE', 'N/A')} "
+                f"RMSE={stacking_metrics.get('RMSE', 'N/A')} "
+                f"{pm}={pv}{unit} "
+                f"R2={stacking_metrics.get('R2', 'N/A')}"
             )
 
             import tensorflow as tf
@@ -751,7 +754,7 @@ def _worker_generate_best(username: str) -> None:
         output_path = os.path.join(OUTPUT_FOLDER, f"{username}_hasil_prediksi_best.csv")
         with open(output_path, "w", encoding="utf-8-sig", newline="") as f:
             f.write("-BEGIN HEADER-\n")
-            f.write(f"Dataset: {os.path.basename(get_active_dataset_path())}\n")
+            f.write(f"Dataset: {os.path.basename(dataset_path)}\n")
             f.write(f"Variabel: {', '.join(TRAIN_VARS)}\n")
             f.write(f"Mode: Best Stacking (XGB + Best DL) per variabel\n")
             for info in stacking_info:
@@ -786,6 +789,7 @@ def _worker_generate_best(username: str) -> None:
 def generate_full():
 
     username = session.get("username")
+    dataset_path = get_active_dataset_path_for_user()
     selected_var = request.form.get("var", "WS10M")
     print(f"🔍 SELECTED VAR: {selected_var}")
 
@@ -808,8 +812,8 @@ def generate_full():
     selected_model = request.form.get("model", "all")
 
     # ✅ Gunakan metrics per variabel untuk tentukan active_models
-    metrics_var = load_metrics_for_var(selected_var)
-    metrics_dl_var = load_dl_metrics_for_var(selected_var)
+    metrics_var = load_metrics_for_var(selected_var, username=username)
+    metrics_dl_var = load_dl_metrics_for_var(selected_var, username=username)
     all_models = list(metrics_var.keys()) + list(metrics_dl_var.keys())
 
     active_models = (
@@ -820,7 +824,7 @@ def generate_full():
 
     threading.Thread(
         target=_worker_generate_full,
-        args=(username, selected_model, active_models, "general", selected_var),
+        args=(username, selected_model, active_models, "general", selected_var, dataset_path),
         daemon=True,
     ).start()
 
@@ -833,6 +837,7 @@ def generate_full():
 @generate_bp.route("/generate_best", methods=["POST"])
 def generate_best():
     username = session.get("username")
+    dataset_path = get_active_dataset_path_for_user()
 
     with progress_lock:
         if generate_progress.get(username, {}).get("running"):
@@ -851,7 +856,7 @@ def generate_best():
         }
 
     # ✅ Validasi minimal satu variabel punya metrics
-    any_ready = any(load_metrics_for_var(var) for var in TRAIN_VARS)
+    any_ready = any(load_metrics_for_var(var, username=username) for var in TRAIN_VARS)
     if not any_ready:
         with progress_lock:
             generate_progress[username].update({"running": False, "done": True})
@@ -867,7 +872,7 @@ def generate_best():
 
     threading.Thread(
         target=_worker_generate_best,
-        args=(username,),  # ✅ tidak perlu selected_var
+        args=(username, dataset_path),  # ✅ tidak perlu selected_var
         daemon=True,
     ).start()
 

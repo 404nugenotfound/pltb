@@ -1,13 +1,13 @@
 export interface Metric {
   MAE: number;
   RMSE: number;
-  MAPE: number;
   R2: number;
-}
-
-export interface PredictionRow {
-  model: string;
-  prediction: number;
-  actual: number;
-  error: number;
+  // primary metric — berbeda per variabel
+  sMAPE?: number;
+  CircularMAE?: number;
+  CircularMAE_pct?: number;
+  primary_metric?: string;
+  primary_value?: number;
+  // legacy
+  MAPE?: number;
 }

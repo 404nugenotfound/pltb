@@ -1,98 +1,76 @@
 import os
 import json
 import hashlib
-
 from config import MODEL_FOLDER
-from utils.dataset import get_active_dataset_path
+
 
 # =========================
 # FILE HASH
 # =========================
-def compute_file_hash(
-    path: str,
-    chunk_size: int = 65536
-) -> str:
-
+def compute_file_hash(path: str, chunk_size: int = 65536) -> str:
     h = hashlib.md5()
-
     with open(path, "rb") as f:
         while chunk := f.read(chunk_size):
             h.update(chunk)
-
     return h.hexdigest()
 
 
 # =========================
-# REGISTRY PATH
+# MODEL DIR PER USER
 # =========================
-def get_registry_path(
-    dataset_path: str = ""
-) -> str:
-
-    if not dataset_path:
-        dataset_path = get_active_dataset_path()
-
-    name = os.path.basename(dataset_path)
-
-    name = name.replace(".csv", "")
-
-    return os.path.join(
-        MODEL_FOLDER,
-        f"registry_{name}.json"
-    )
+def get_model_dir_for_user(username: str) -> str:
+    return os.path.join(MODEL_FOLDER, f"snap_{username}")
 
 
 # =========================
-# LOAD REGISTRY
+# CHECK TRAINED — per user
 # =========================
-def load_model_registry(
-    dataset_path: str = ""
-) -> dict:
-
-    path = get_registry_path(dataset_path)
-
-    if os.path.exists(path):
-        try:
-            with open(path, "r") as f:
-                return json.load(f)
-
-        except Exception:
-            pass
-
-    return {}
-
-
-# =========================
-# SAVE REGISTRY
-# =========================
-def save_model_registry(
-    registry: dict,
-    dataset_path: str = ""
-) -> None:
-
-    path = get_registry_path(dataset_path)
-
-    with open(path, "w") as f:
-        json.dump(registry, f, indent=2)
-
-
-# =========================
-# CHECK TRAINED
-# =========================
-def is_dataset_already_trained(
-    dataset_path: str
-):
-
+def is_dataset_already_trained(dataset_path: str, username: str = "") -> tuple:
     file_hash = compute_file_hash(dataset_path)
 
-    registry = load_model_registry(dataset_path)
+    if not username:
+        return False, file_hash
 
-    return file_hash in registry, file_hash
+    from utils.user_helpers import load_user
+
+    user = load_user(username)
+    if not user:
+        return False, file_hash
+
+    registry = user.get("registry", {})
+    already_trained = file_hash in registry and os.path.exists(
+        get_model_dir_for_user(username)
+    )
+    return already_trained, file_hash
 
 
 # =========================
-# MODEL SNAPSHOT DIR
+# SAVE REGISTRY — ke user JSON
 # =========================
-def get_model_dir_for_hash(file_hash: str, username: str = "") -> str:
-    suffix = f"{username}_{file_hash[:8]}" if username else file_hash[:12]
-    return os.path.join(MODEL_FOLDER, f"snap_{suffix}")
+def save_model_registry(username: str, file_hash: str, dataset_path: str) -> None:
+    from utils.user_helpers import load_user, save_user
+
+    user = load_user(username)
+    if not user:
+        return
+    if "registry" not in user:
+        user["registry"] = {}
+    user["registry"][file_hash] = {
+        "trained_at": __import__("pandas").Timestamp.now().isoformat(),
+        "dataset": os.path.basename(dataset_path),
+    }
+    save_user(user)
+
+
+# =========================
+# LOAD REGISTRY — dari user JSON
+# =========================
+def load_model_registry(username: str = "") -> dict:
+    if not username:
+        return {}
+    from utils.user_helpers import load_user
+
+    user = load_user(username)
+    if not user:
+        return {}
+    return user.get("registry", {})

@@ -2,24 +2,40 @@
 import { useState, useEffect, useCallback } from "react";
 
 interface ModelMetrics {
-  MAE: number;
-  RMSE: number;
-  sMAPE: number;
-  R2: number;
+  [key: string]: number | string | undefined;
+
+  MAE?: number;
+  RMSE?: number;
+  sMAPE?: number;
+  R2?: number;
+
+  CircularMAE?: number;
+  CircularRMSE?: number;
+  CircularCorr?: number;
+  Acc15?: number;
+
+  EVS?: number;
+
+  primary_metric?: string;
+  primary_value?: number;
+
+  MAE_pct?: number;
+  CircularMAE_pct?: number;
 }
 
 interface ForecastingData {
   dataset_name: string;
   metrics: Record<string, ModelMetrics>;
   best_models: string[];
-  stacking_metrics: {          // ← tambah
+  ensemble_summary?: Record<string, any>;
+  stacking_metrics: {
     xgb?: ModelMetrics;
     xgbLstm?: ModelMetrics;
     xgbBiLstm?: ModelMetrics;
   };
 }
 
-export function useMetrics(selectedVar: string = "WS10M") {  // ← tambah param
+export function useMetrics(selectedVar: string = "WS10M") {
   const [data, setData] = useState<ForecastingData>({
     dataset_name: "",
     metrics: {},
@@ -31,16 +47,16 @@ export function useMetrics(selectedVar: string = "WS10M") {  // ← tambah param
   const fetchData = useCallback(async () => {
     try {
       const username = sessionStorage.getItem("ventara_username") || "";
-      const res = await fetch(`/api/forecasting-data?username=${username}&var=${selectedVar}`);  // ← tambah &var
+      const res = await fetch(`/api/forecasting-data?username=${username}&var=${selectedVar}`);
       const json = await res.json();
-      if (json.error || !json.metrics) return;  // ← tambah guard
+      if (json.error || !json.metrics) return;
       setData(json);
     } catch (e) {
       console.error("Failed to fetch metrics:", e);
     } finally {
       setLoading(false);
     }
-  }, [selectedVar]);  // ← selectedVar jadi dependency
+  }, [selectedVar]);
 
   useEffect(() => {
     fetchData();

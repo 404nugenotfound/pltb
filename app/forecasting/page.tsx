@@ -176,6 +176,7 @@ export default function ForecastingPage() {
                 metrics={metrics}
                 selectedModel={selectedModel}
                 bestModels={best_models}
+                selectedVar={selectedVars} 
                 stackingMetrics={stacking_metrics}
                 ensembleSummary={ensembleSummary}  // ← tambah
               />
