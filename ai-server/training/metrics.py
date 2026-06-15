@@ -277,7 +277,7 @@ def compute_metrics_fresh(
 
 
 def save_ensemble_metrics(
-    var_name: str, ml_name: str, dl_name: str, metrics: dict, username: str = ""
+    var_name: str, ml_name: str, dl_name: str, train_metrics: dict, test_metrics: dict, username: str = ""
 ):
     from utils.user_helpers import load_user, save_user
 
@@ -294,7 +294,7 @@ def save_ensemble_metrics(
         "ml_name": ml_name,
         "dl_name": dl_name,
         "components": [ml_name, dl_name],
-        f"{ml_name}+{dl_name}": {"train": metrics, "test": metrics},
+        f"{ml_name}+{dl_name}": {"train": train_metrics, "test": test_metrics}
     }
     save_user(user)
     

@@ -150,8 +150,51 @@ def build_forecast_text(df_future: pd.DataFrame, var: str) -> dict:
     }
 
 
+def _classify_location(stats_per_var: dict) -> tuple[str, str]:
+    scores = []
+
+    thresholds = {
+        "WS10M": (0.4, 0.7),
+        "WD10M": (45.0, 60.0),
+        "T2M":   (1.5, 3.0),
+        "RH2M":  (8.0, 15.0),
+        "PS":    (0.3, 0.6),
+    }
+
+    for var, (lo, hi) in thresholds.items():
+        std = stats_per_var.get(var, {}).get("std_val", None)
+        if std is None:
+            continue
+        if std < lo:
+            scores.append(0)
+        elif std <= hi:
+            scores.append(1)
+        else:
+            scores.append(2)
+
+    if not scores:
+        return "Tidak Terklasifikasi", "data tidak cukup untuk menentukan karakteristik lokasi"
+
+    avg_score = sum(scores) / len(scores)
+
+    if avg_score < 0.6:
+        return (
+            "Very Stable",
+            "kondisi atmosfer sangat konsisten — ideal untuk prediksi energi jangka panjang pada PLTB",
+        )
+    elif avg_score < 1.4:
+        return (
+            "Moderate",
+            "pola atmosfer cukup konsisten dengan variasi dalam batas wajar untuk operasional PLTB",
+        )
+    else:
+        return (
+            "Fluctuating",
+            "terdapat variasi atmosfer yang signifikan — diperlukan pemantauan lebih intensif pada sistem PLTB",
+        )
+
+
 def generate_nlp_report(stats: dict, best_model_name: str, best_met: dict) -> str:
-    """NLP report untuk satu variabel — dipakai di Generate General."""
     smape_raw = (
         str(best_met.get("sMAPE", "-")).replace(",", ".").replace("%", "").strip()
     )
@@ -175,7 +218,6 @@ def generate_nlp_report(stats: dict, best_model_name: str, best_met: dict) -> st
     satuan = stats.get("satuan", "")
     avg = stats["avg"]
 
-    # Interpretasi kontekstual
     if nama == "kecepatan angin":
         if avg < 1.5:
             konteks = "Kondisi ini kurang ideal untuk operasional PLTB karena berada di bawah cut-in speed turbin."
@@ -194,12 +236,12 @@ def generate_nlp_report(stats: dict, best_model_name: str, best_met: dict) -> st
             konteks = "Kelembaban tinggi perlu diperhatikan karena berpotensi mempercepat korosi pada komponen turbin."
     elif nama == "arah angin":
         konteks = (
-            f"Arah angin dominan {stats['category']} ({avg:.1f}°), "
+            f"Arah angin dominan {stats['category']} ({avg:.1f}\u00b0), "
             f"penting untuk kalibrasi yaw control dan optimasi layout PLTB."
         )
     elif nama == "suhu udara":
         konteks = (
-            f"Suhu udara rata-rata {avg:.1f}°C tergolong {stats['category']}. "
+            f"Suhu udara rata-rata {avg:.1f}\u00b0C tergolong {stats['category']}. "
             f"Suhu berpengaruh pada densitas udara yang mempengaruhi efisiensi turbin angin."
         )
     elif nama == "tekanan atmosfer":
@@ -210,77 +252,109 @@ def generate_nlp_report(stats: dict, best_model_name: str, best_met: dict) -> st
     else:
         konteks = f"Nilai {nama} berada pada kisaran normal untuk wilayah pengamatan."
 
-    # Build performa string per variabel
     try:
         r2 = float(r2_raw)
         r2_interp = "sangat baik" if r2 >= 0.95 else "baik" if r2 >= 0.85 else "cukup"
-    except:
+    except Exception:
         r2_interp = "tidak tersedia"
 
     if nama == "arah angin":
-        circular_mae = str(best_met.get("CircularMAE", "N/A"))
-        circular_mae_pct = str(best_met.get("CircularMAE_pct", "N/A"))
-        performa_str = (
-            f"CircularMAE **{circular_mae}°** ({circular_mae_pct}%), "
-            f"RMSE {rmse_str} {satuan}, R² {r2_str} ({r2_interp})"
-        )
-        akurasi_val = best_met.get("CircularMAE_pct", 999)
-        try:
-            akurasi = (
-                "tinggi"
-                if float(akurasi_val) < 5
-                else "cukup" if float(akurasi_val) < 15 else "rendah"
-            )
-        except:
+        circular_mae = best_met.get("CircularMAE", None)
+        circular_rmse = best_met.get("CircularRMSE", None)
+        circular_corr = best_met.get("CircularCorr", None)
+        acc15 = best_met.get("Acc15", None)
+
+        circular_mae_str = f"{circular_mae:.3f}" if circular_mae is not None else "N/A"
+        circular_rmse_str = f"{circular_rmse:.3f}" if circular_rmse is not None else "N/A"
+        circular_corr_str = f"{circular_corr:.3f}" if circular_corr is not None else "N/A"
+        acc15_str = f"{acc15:.1f}" if acc15 is not None else "N/A"
+
+        if circular_mae is not None:
+            circular_mae_pct = round((circular_mae / 180) * 100, 2)
+            circular_mae_pct_str = f"{circular_mae_pct:.2f}"
+            akurasi = "tinggi" if circular_mae_pct < 5 else "cukup" if circular_mae_pct < 15 else "rendah"
+        else:
+            circular_mae_pct_str = "N/A"
             akurasi = "tidak tersedia"
-    elif nama == "tekanan atmosfer" or nama == "suhu udara" or nama == "kelembaban udara":
+
         performa_str = (
-            f"MAE {mae_str} {satuan}, RMSE {rmse_str} {satuan}, R² {r2_str} ({r2_interp})"
+            f"CircularMAE **{circular_mae_str}\u00b0** ({circular_mae_pct_str}% dari 180\u00b0), "
+            f"CircularRMSE **{circular_rmse_str}\u00b0**, "
+            f"CircularCorr **{circular_corr_str}**, "
+            f"Acc\u00b115\u00b0 **{acc15_str}%**"
+        )
+        penutup = (
+            f"Model mampu memprediksi arah angin dengan akurasi \u00b115\u00b0 sebesar **{acc15_str}%**. "
+            f"Akurasi keseluruhan tergolong **{akurasi}**."
+        )
+
+    elif nama == "tekanan atmosfer":
+        evs_raw = str(best_met.get("EVS", "-")).replace(",", ".").strip()
+        evs_str = "N/A" if evs_raw.lower() in ("-", "", "nan", "none") else evs_raw
+        performa_str = (
+            f"MAE **{mae_str}** {satuan}, RMSE **{rmse_str}** {satuan}, "
+            f"R\u00b2 **{r2_str}** ({r2_interp}), EVS **{evs_str}**"
         )
         try:
             akurasi = "tinggi" if float(mae_raw) < 2 else "cukup" if float(mae_raw) < 5 else "rendah"
-        except:
+        except Exception:
             akurasi = "tidak tersedia"
+        penutup = (
+            f"Model mampu menjelaskan variasi data dengan kemampuan {r2_interp}. "
+            f"Akurasi keseluruhan tergolong **{akurasi}**."
+        )
+
+    elif nama in ("suhu udara", "kelembaban udara"):
+        performa_str = (
+            f"MAE **{mae_str}** {satuan}, RMSE **{rmse_str}** {satuan}, "
+            f"sMAPE **{smape_str}**, R\u00b2 **{r2_str}** ({r2_interp})"
+        )
+        try:
+            akurasi = "tinggi" if float(mae_raw) < 2 else "cukup" if float(mae_raw) < 5 else "rendah"
+        except Exception:
+            akurasi = "tidak tersedia"
+        penutup = (
+            f"Model mampu menjelaskan variasi data dengan kemampuan {r2_interp}. "
+            f"Akurasi keseluruhan tergolong **{akurasi}**."
+        )
+
     else:
         performa_str = (
-            f"MAE {mae_str} {satuan}, RMSE {rmse_str} {satuan}, "
-            f"sMAPE {smape_str}, R² {r2_str} ({r2_interp})"
+            f"MAE **{mae_str}** {satuan}, RMSE **{rmse_str}** {satuan}, "
+            f"sMAPE **{smape_str}**, R\u00b2 **{r2_str}** ({r2_interp})"
+        )
+        penutup = (
+            f"Model mampu menjelaskan variasi data dengan kemampuan {r2_interp}. "
+            f"Akurasi keseluruhan tergolong **{akurasi}**."
         )
 
     return (
         f"Ringkasan prediksi {nama} untuk periode "
         f"{stats['start_date']} hingga {stats['end_date']}:\n"
         f"\n"
-        f"▸ Statistik: rata-rata {stats['avg']:.2f} {satuan} ({stats['category']}), "
+        f"\u25b8 Statistik: rata-rata {stats['avg']:.2f} {satuan} ({stats['category']}), "
         f"tertinggi {stats['max_val']:.2f} {satuan}, terendah {stats['min_val']:.2f} {satuan}, "
         f"standar deviasi {stats['std_val']:.2f} {satuan}. "
         f"Rentang nilai harian mencapai {stats['max_val'] - stats['min_val']:.2f} {satuan}.\n"
         f"\n"
-        f"▸ Pola harian: puncak sekitar pukul {stats['peak_hr']:02d}:00, "
+        f"\u25b8 Pola harian: puncak sekitar pukul {stats['peak_hr']:02d}:00, "
         f"lembah sekitar pukul {stats['low_hr']:02d}:00. "
         f"Tren {stats['trend']}.\n"
         f"\n"
-        f"▸ Analisis: {konteks} "
+        f"\u25b8 Analisis: {konteks} "
         f"Pemantauan berkala tetap disarankan untuk mengantisipasi perubahan kondisi atmosfer "
         f"yang dapat mempengaruhi kinerja sistem.\n"
         f"\n"
-        f"▸ Performa model: {best_model_name} — "
+        f"\u25b8 Performa model: {best_model_name} \u2014 "
         f"{performa_str}. "
-        f"Model mampu menjelaskan variasi data dengan kemampuan {r2_interp}. "
-        f"Akurasi keseluruhan tergolong {akurasi}."
+        f"{penutup}"
     )
 
 
 def generate_nlp_report_best(
-    stats_per_var: dict,  # {"WS10M": stats_dict, "RH2M": stats_dict, "WD10M": stats_dict}
-    best_per_var: dict,  # {"WS10M": ("GBR", {"sMAPE":..,"RMSE":..}), ...}
+    stats_per_var: dict,
+    best_per_var: dict,
 ) -> str:
-    """
-    ✅ NLP report untuk Generate Best — merangkum ketiga variabel sekaligus.
-    stats_per_var : hasil build_forecast_text per variabel
-    best_per_var  : model terbaik dan metriknya per variabel
-    """
-    # Ambil periode dari variabel pertama yang ada
     first_stats = next(iter(stats_per_var.values()))
     start_date = first_stats["start_date"]
     end_date = first_stats["end_date"]
@@ -304,25 +378,30 @@ def generate_nlp_report_best(
             .replace("%", "")
             .strip()
         )
-        rmse_raw = str(best_met.get("RMSE", "-")).replace(",", ".").strip()
 
         if pv_raw.lower() in ("-", "", "nan", "none"):
             pv_str = "N/A"
             akurasi = "tidak tersedia"
         else:
             pv = float(pv_raw)
-            pv_str = f"{pv:.2f}%"
-            # ← fix threshold per primary metric
             if pm == "CircularMAE":
-                akurasi = "tinggi" if pv < 5 else "cukup" if pv < 15 else "rendah"
+                pv_str = f"{pv:.3f}\u00b0"
+                akurasi = "tinggi" if pv < 9 else "cukup" if pv < 27 else "rendah"
             else:
+                pv_str = f"{pv:.2f}%"
                 akurasi = "tinggi" if pv < 10 else "cukup" if pv < 20 else "rendah"
-            mape_list.append(pv)
+                mape_list.append(pv)
 
-        rmse_str = "N/A" if rmse_raw.lower() in ("-", "", "nan", "none") else rmse_raw
+        if pm == "CircularMAE":
+            acc15 = best_met.get("Acc15", None)
+            secondary_str = f"Acc\u00b115\u00b0 **{acc15:.1f}%**" if acc15 is not None else "Acc\u00b115\u00b0 **N/A**"
+        else:
+            rmse_raw = str(best_met.get("RMSE", "-")).replace(",", ".").strip()
+            rmse_str = "N/A" if rmse_raw.lower() in ("-", "", "nan", "none") else rmse_raw
+            secondary_str = f"RMSE **{rmse_str}**"
 
         lines.append(
-            f"▸ {nama.capitalize()} ({var}): "
+            f"\u25b8 {nama.capitalize()} ({var}): "
             f"rata-rata **{stats['avg']:.2f} {satuan}**, "
             f"kategori **{stats['category']}**, "
             f"tren {stats['trend']}. "
@@ -330,18 +409,23 @@ def generate_nlp_report_best(
             f"terendah **{stats['min_val']:.2f} {satuan}**. "
             f"Puncak pukul **{stats['peak_hr']:02d}:00**, "
             f"terendah pukul **{stats['low_hr']:02d}:00**. "
-            f"Model: **{best_name}** | {pm} **{pv_str}** | RMSE **{rmse_str}** "
+            f"Model: **{best_name}** | {pm} **{pv_str}** | {secondary_str} "
             f"(akurasi **{akurasi}**).\n"
         )
 
-    # Rata-rata sMAPE keseluruhan
     if mape_list:
         avg_pv = sum(mape_list) / len(mape_list)
         avg_akurasi = "tinggi" if avg_pv < 10 else "cukup" if avg_pv < 20 else "rendah"
         lines.append(
             f"\nRata-rata error keseluruhan: **{avg_pv:.2f}%** "
-            f"— tingkat akurasi prediksi tergolong **{avg_akurasi}** "
+            f"\u2014 tingkat akurasi prediksi tergolong **{avg_akurasi}** "
             f"(CircularMAE untuk arah angin, MAE/sMAPE untuk variabel lain)."
         )
+
+    stabilitas, stabilitas_desc = _classify_location(stats_per_var)
+    lines.append(
+        f"\nKlasifikasi lokasi: **{stabilitas}** \u2014 {stabilitas_desc}. "
+        f"Hasil ini dapat digunakan sebagai referensi dalam perencanaan dan optimasi sistem PLTB."
+    )
 
     return "\n".join(lines)

@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 import { useGenerateContext } from "@/app/context/GenerateContext";
 
 export default function ForecastingPage() {
-  const ALL_VARS = ["RH2M", "WS10M", "WD10M", "T2M", "PS"];  
+  const ALL_VARS = ["WS10M", "WD10M", "T2M", "RH2M", "PS"];  
 
   const [selectedModel, setSelectedModel] = useState("all");
   const [selectedVars, setSelectedVars]   = useState("WS10M");

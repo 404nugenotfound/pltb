@@ -147,20 +147,20 @@
         ],
         "XGB+BiLSTM": {
           "train": {
-            "MAE": 0.223,
-            "RMSE": 0.296,
-            "R2": 0.955,
-            "sMAPE": 7.94,
+            "MAE": 0.224,
+            "RMSE": 0.297,
+            "R2": 0.956,
+            "sMAPE": 7.9,
             "primary_metric": "sMAPE",
-            "primary_value": 7.94
+            "primary_value": 7.9
           },
           "test": {
-            "MAE": 0.223,
-            "RMSE": 0.296,
-            "R2": 0.955,
-            "sMAPE": 7.94,
+            "MAE": 0.219,
+            "RMSE": 0.291,
+            "R2": 0.95,
+            "sMAPE": 8.08,
             "primary_metric": "sMAPE",
-            "primary_value": 7.94
+            "primary_value": 8.08
           }
         }
       }
@@ -269,20 +269,20 @@
         ],
         "XGB+LSTM": {
           "train": {
-            "CircularMAE": 2.373,
-            "CircularRMSE": 6.061,
+            "CircularMAE": 2.342,
+            "CircularRMSE": 6.063,
             "CircularCorr": 0.995,
-            "Acc15": 98.49,
+            "Acc15": 98.5,
             "primary_metric": "CircularMAE",
-            "primary_value": 2.373
+            "primary_value": 2.342
           },
           "test": {
-            "CircularMAE": 2.373,
-            "CircularRMSE": 6.061,
-            "CircularCorr": 0.995,
-            "Acc15": 98.49,
+            "CircularMAE": 2.536,
+            "CircularRMSE": 5.928,
+            "CircularCorr": 0.996,
+            "Acc15": 98.45,
             "primary_metric": "CircularMAE",
-            "primary_value": 2.373
+            "primary_value": 2.536
           }
         }
       }
@@ -401,22 +401,22 @@
         ],
         "XGB+BiLSTM": {
           "train": {
-            "MAE": 1.387,
-            "RMSE": 1.892,
-            "R2": 0.965,
-            "sMAPE": 1.72,
-            "MAE_pct": 1.39,
+            "MAE": 1.406,
+            "RMSE": 1.917,
+            "R2": 0.967,
+            "sMAPE": 1.76,
+            "MAE_pct": 1.41,
             "primary_metric": "MAE",
-            "primary_value": 1.39
+            "primary_value": 1.41
           },
           "test": {
-            "MAE": 1.387,
-            "RMSE": 1.892,
-            "R2": 0.965,
-            "sMAPE": 1.72,
-            "MAE_pct": 1.39,
+            "MAE": 1.29,
+            "RMSE": 1.763,
+            "R2": 0.946,
+            "sMAPE": 1.55,
+            "MAE_pct": 1.29,
             "primary_metric": "MAE",
-            "primary_value": 1.39
+            "primary_value": 1.29
           }
         }
       }
@@ -525,20 +525,20 @@
         ],
         "XGB+BiLSTM": {
           "train": {
-            "MAE": 0.228,
-            "RMSE": 0.304,
+            "MAE": 0.232,
+            "RMSE": 0.308,
             "R2": 0.981,
-            "sMAPE": 0.88,
+            "sMAPE": 0.89,
             "primary_metric": "sMAPE",
-            "primary_value": 0.88
+            "primary_value": 0.89
           },
           "test": {
-            "MAE": 0.228,
-            "RMSE": 0.304,
-            "R2": 0.981,
-            "sMAPE": 0.88,
+            "MAE": 0.214,
+            "RMSE": 0.283,
+            "R2": 0.975,
+            "sMAPE": 0.82,
             "primary_metric": "sMAPE",
-            "primary_value": 0.88
+            "primary_value": 0.82
           }
         }
       }
@@ -655,12 +655,12 @@
             "primary_value": 0.022
           },
           "test": {
-            "MAE": 0.022,
-            "RMSE": 0.028,
-            "R2": 0.978,
-            "EVS": 0.979,
+            "MAE": 0.021,
+            "RMSE": 0.027,
+            "R2": 0.974,
+            "EVS": 0.974,
             "primary_metric": "MAE",
-            "primary_value": 0.022
+            "primary_value": 0.021
           }
         }
       }

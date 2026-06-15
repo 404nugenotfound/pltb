@@ -186,7 +186,8 @@ def _worker_generate_full(
         )
         history_window = df_var.tail(STEP).copy().reset_index(drop=True)
         future_rows = []
-
+        
+        lo, hi = {"WS10M": (0, 50), "RH2M": (0, 100), "WD10M": (0, 360)}.get(selected_var, (None, None))    
         for i in range(future_steps):
             with progress_lock:
                 if generate_progress.get(username, {}).get("cancel"):
@@ -241,6 +242,8 @@ def _worker_generate_full(
                 elif col == "T2M":  # ← TAMBAH INI
                     same_hour = df[df["HR"] == next_time.hour]["T2M"].mean()
                     fv.append(float(same_hour))
+                elif col == "std24":
+                    fv.append(float(np.std(target_series[-24:])))
                 else:
                     fv.append(float(last_row_dict.get(col, 0.0)))
 
@@ -268,6 +271,10 @@ def _worker_generate_full(
                 anchor = pred_knn
             if np.isnan(anchor):
                 anchor = lag1
+            
+            
+            if lo is not None and not np.isnan(anchor):
+                anchor = float(np.clip(anchor, lo, hi))
 
             pred_lstm = pred_bilstm = float("nan")
             if need_dl and any(m in active_models for m in ["LSTM", "BiLSTM"]):
@@ -305,14 +312,22 @@ def _worker_generate_full(
                         pred_lstm = float(
                             decode_dl(lstm.predict(seq_future, verbose=0))[0]
                         )
+                        if lo is not None and not np.isnan(pred_lstm):
+                            pred_lstm = float(np.clip(pred_lstm, lo, hi))
                     if "BiLSTM" in active_models:
                         pred_bilstm = float(
                             decode_dl(bilstm.predict(seq_future, verbose=0))[0]
                         )
+                        if lo is not None and not np.isnan(pred_bilstm):
+                            pred_bilstm = float(np.clip(pred_bilstm, lo, hi))
+                            
                 except Exception as dl_err:
                     print(f"⚠️ DL skip iter {i}: {dl_err}")
 
             target_series.append(anchor)
+            if selected_var == "WD10M":
+                last_row_dict["WD10M_sin"] = float(np.sin(np.deg2rad(anchor)))
+                last_row_dict["WD10M_cos"] = float(np.cos(np.deg2rad(anchor)))
 
             row: dict = {
                 "YEAR": int(next_time.year),
@@ -404,6 +419,7 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
     from training.load_dl import load_dl_for_var
     from training.metrics import (
         get_metrics,
+        get_metrics_for_var,
         load_metrics_for_var,
         load_dl_metrics_for_var,
     )
@@ -503,26 +519,57 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
             )
 
             BATCH = 2048
-            raw_preds = []
-            for start in range(STEP, len(_X_sc), BATCH):
-                end = min(start + BATCH, len(_X_sc))
+            n = len(_X_sc)
+            split_train = int(n * 0.8)
+            split_val   = int(n * 0.9)
+
+            # --- TRAIN predictions ---
+            raw_train = []
+            for start in range(STEP, split_train, BATCH):
+                end = min(start + BATCH, split_train)
                 batch_seqs = np.array(
                     [_X_sc[i - STEP : i] for i in range(start, end)], dtype=np.float32
                 )
-                raw_preds.append(_lstm.predict(batch_seqs, verbose=0))
+                raw_train.append(_lstm.predict(batch_seqs, verbose=0))
+            stacked_train_preds = decode_dl(np.concatenate(raw_train, axis=0))
+            y_train_slice = y[STEP:split_train]
 
-            raw_concat = np.concatenate(raw_preds, axis=0)
-            stacked_preds = decode_dl(raw_concat)
+            # --- TEST predictions ---
+            raw_test = []
+            for start in range(split_val, n, BATCH):
+                end = min(start + BATCH, n)
+                batch_seqs = np.array(
+                    [_X_sc[i - STEP : i] for i in range(start, end)], dtype=np.float32
+                )
+                raw_test.append(_lstm.predict(batch_seqs, verbose=0))
+            stacked_test_preds = decode_dl(np.concatenate(raw_test, axis=0))
+            y_test_slice = y[split_val:]
 
-            stacking_metrics = get_metrics_for_var(
-                np.array(y[STEP : STEP + len(stacked_preds)]),
-                np.array(stacked_preds),
+            # --- Metrics terpisah ---
+            train_metrics = get_metrics_for_var(
+                np.array(y_train_slice),
+                np.array(stacked_train_preds[:len(y_train_slice)]),
                 var,
             )
+            test_metrics = get_metrics_for_var(
+                np.array(y_test_slice),
+                np.array(stacked_test_preds[:len(y_test_slice)]),
+                var,
+            )
+            stacking_metrics = test_metrics  # untuk NLP report & stacking_info
+
+            # --- ALL data untuk chart historis ---
+            raw_all = []
+            for start in range(STEP, n, BATCH):
+                end = min(start + BATCH, n)
+                batch_seqs = np.array(
+                    [_X_sc[i - STEP : i] for i in range(start, end)], dtype=np.float32
+                )
+                raw_all.append(_lstm.predict(batch_seqs, verbose=0))
+            stacked_preds = decode_dl(np.concatenate(raw_all, axis=0))
 
             from training.metrics import save_ensemble_metrics
-
-            save_ensemble_metrics(var, "XGB", best_dl_name, stacking_metrics, username=username)
+            save_ensemble_metrics(var, "XGB", best_dl_name, train_metrics, test_metrics, username=username)
 
             ensemble_summary[var] = {
                 "ml": "XGB",

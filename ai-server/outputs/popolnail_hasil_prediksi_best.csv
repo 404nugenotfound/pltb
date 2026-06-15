@@ -2,27 +2,29 @@
 Dataset: NASA_Baron_Hourly.csv
 Variabel: WS10M, WD10M, RH2M, T2M, PS
 Mode: Best Stacking (XGB + Best DL) per variabel
-WS10M | Model: XGB-BiLSTM [WS10M] | MAE=0.223 RMSE=0.296 sMAPE=7.94% R2=0.955
-WD10M | Model: XGB-LSTM [WD10M] | MAE=N/A RMSE=N/A CircularMAE=2.373° R2=N/A
-RH2M | Model: XGB-BiLSTM [RH2M] | MAE=1.387 RMSE=1.892 MAE=1.39 R2=0.965
-T2M | Model: XGB-BiLSTM [T2M] | MAE=0.228 RMSE=0.304 sMAPE=0.88% R2=0.981
-PS | Model: XGB-LSTM [PS] | MAE=0.022 RMSE=0.028 MAE=0.022 R2=0.978
+WS10M | Model: XGB-BiLSTM [WS10M] | MAE=0.219 RMSE=0.291 sMAPE=8.08% R2=0.95
+WD10M | Model: XGB-LSTM [WD10M] | MAE=N/A RMSE=N/A CircularMAE=2.536° R2=N/A
+RH2M | Model: XGB-BiLSTM [RH2M] | MAE=1.29 RMSE=1.763 MAE=1.29 R2=0.946
+T2M | Model: XGB-BiLSTM [T2M] | MAE=0.214 RMSE=0.283 sMAPE=0.82% R2=0.975
+PS | Model: XGB-LSTM [PS] | MAE=0.021 RMSE=0.027 MAE=0.021 R2=0.974
 
 Forecast Summary:
 Ringkasan prediksi cuaca untuk periode 01-01-2023 hingga 08-01-2023:
 
-▸ Kecepatan angin (WS10M): rata-rata **2.27 m/s**, kategori **angin sepoi ringan**, tren menurun menuju akhir periode. Tertinggi **5.40 m/s**, terendah **0.68 m/s**. Puncak pukul **12:00**, terendah pukul **02:00**. Model: **XGB-BiLSTM [WS10M]** | sMAPE **7.94%** | RMSE **0.296** (akurasi **tinggi**).
+▸ Kecepatan angin (WS10M): rata-rata **2.27 m/s**, kategori **angin sepoi ringan**, tren menurun menuju akhir periode. Tertinggi **5.40 m/s**, terendah **0.68 m/s**. Puncak pukul **12:00**, terendah pukul **02:00**. Model: **XGB-BiLSTM [WS10M]** | sMAPE **8.08%** | RMSE **0.291** (akurasi **tinggi**).
 
-▸ Arah angin (WD10M): rata-rata **266.58 derajat**, kategori **dari barat daya**, tren menurun menuju akhir periode. Tertinggi **297.03 derajat**, terendah **253.97 derajat**. Puncak pukul **12:00**, terendah pukul **01:00**. Model: **XGB-LSTM [WD10M]** | CircularMAE **2.37%** | RMSE **N/A** (akurasi **tinggi**).
+▸ Arah angin (WD10M): rata-rata **266.58 derajat**, kategori **dari barat daya**, tren menurun menuju akhir periode. Tertinggi **297.03 derajat**, terendah **253.97 derajat**. Puncak pukul **12:00**, terendah pukul **01:00**. Model: **XGB-LSTM [WD10M]** | CircularMAE **2.536°** | Acc±15° **98.5%** (akurasi **tinggi**).
 
-▸ Kelembaban udara (RH2M): rata-rata **71.71 %**, kategori **lembab**, tren meningkat menuju akhir periode. Tertinggi **84.55 %**, terendah **57.74 %**. Puncak pukul **05:00**, terendah pukul **13:00**. Model: **XGB-BiLSTM [RH2M]** | MAE **1.39%** | RMSE **1.892** (akurasi **tinggi**).
+▸ Kelembaban udara (RH2M): rata-rata **71.71 %**, kategori **lembab**, tren meningkat menuju akhir periode. Tertinggi **84.55 %**, terendah **57.74 %**. Puncak pukul **05:00**, terendah pukul **13:00**. Model: **XGB-BiLSTM [RH2M]** | MAE **1.29%** | RMSE **1.763** (akurasi **tinggi**).
 
-▸ Suhu udara (T2M): rata-rata **22.27 °C**, kategori **sejuk**, tren menurun menuju akhir periode. Tertinggi **27.22 °C**, terendah **20.75 °C**. Puncak pukul **09:00**, terendah pukul **03:00**. Model: **XGB-BiLSTM [T2M]** | sMAPE **0.88%** | RMSE **0.304** (akurasi **tinggi**).
+▸ Suhu udara (T2M): rata-rata **22.27 °C**, kategori **sejuk**, tren menurun menuju akhir periode. Tertinggi **27.22 °C**, terendah **20.75 °C**. Puncak pukul **09:00**, terendah pukul **03:00**. Model: **XGB-BiLSTM [T2M]** | sMAPE **0.82%** | RMSE **0.283** (akurasi **tinggi**).
 
-▸ Tekanan atmosfer (PS): rata-rata **98.64 kPa**, kategori **rendah**, tren relatif stabil sepanjang periode. Tertinggi **99.36 kPa**, terendah **98.59 kPa**. Puncak pukul **07:00**, terendah pukul **23:00**. Model: **XGB-LSTM [PS]** | MAE **0.02%** | RMSE **0.028** (akurasi **tinggi**).
+▸ Tekanan atmosfer (PS): rata-rata **98.64 kPa**, kategori **rendah**, tren relatif stabil sepanjang periode. Tertinggi **99.36 kPa**, terendah **98.59 kPa**. Puncak pukul **07:00**, terendah pukul **23:00**. Model: **XGB-LSTM [PS]** | MAE **0.02%** | RMSE **0.027** (akurasi **tinggi**).
 
 
-Rata-rata error keseluruhan: **2.52%** — tingkat akurasi prediksi tergolong **tinggi** (CircularMAE untuk arah angin, MAE/sMAPE untuk variabel lain).
+Rata-rata error keseluruhan: **2.55%** — tingkat akurasi prediksi tergolong **tinggi** (CircularMAE untuk arah angin, MAE/sMAPE untuk variabel lain).
+
+Klasifikasi lokasi: **Very Stable** — kondisi atmosfer sangat konsisten — ideal untuk prediksi energi jangka panjang pada PLTB. Hasil ini dapat digunakan sebagai referensi dalam perencanaan dan optimasi sistem PLTB.
 
 -END HEADER-
 

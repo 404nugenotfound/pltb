@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const ALL_METRICS = [
   "MAE",
@@ -14,8 +14,8 @@ const ALL_METRICS = [
 type Metric = (typeof ALL_METRICS)[number];
 
 interface ModelMetrics {
-  train: Record<Metric, number>;
-  test: Record<Metric, number>;
+  train: Record<string, number>;
+  test: Record<string, number>;
 }
 
 interface OverfitData {
@@ -32,11 +32,20 @@ interface OverfitChartProps {
 const COLOR_TRAIN = "#14b8a6";
 const COLOR_TEST = "#3b82f6";
 
-function overfitGap(metric: Metric, train: number, test: number) {
+const EXCLUDE_KEYS = new Set([
+  "primary_metric",
+  "primary_value",
+  "MAE_pct",
+  "CircularMAE_pct",
+]);
+
+const VAR_ORDER = ["WS10M", "WD10M", "T2M", "RH2M", "PS"];
+
+function overfitGap(metric: string, train: number, test: number) {
   return metric === "R2" ? train - test : test - train;
 }
 
-function getThreshold(metric: Metric) {
+function getThreshold(metric: string) {
   if (metric === "R2") return { fit: 5, warn: 10 };
   if (
     metric === "sMAPE" ||
@@ -52,7 +61,7 @@ function OverfitBadge({
   train,
   test,
 }: {
-  metric: Metric;
+  metric: string;
   train: number;
   test: number;
 }) {
@@ -84,7 +93,7 @@ function MetricCard({
   train,
   test,
 }: {
-  metric: Metric;
+  metric: string;
   train: number;
   test: number;
 }) {
@@ -120,67 +129,60 @@ function MetricCard({
   );
 }
 
-const EXCLUDE_KEYS = [
-  "primary_metric",
-  "primary_value",
-  "MAE_pct",
-  "CircularMAE_pct",
-];
+function MetricGrid({ modelData }: { modelData: ModelMetrics }) {
+  const metrics = Object.keys(modelData.train).filter(
+    (m) => !EXCLUDE_KEYS.has(m),
+  );
+  return (
+    <>
+      <div className="grid grid-cols-2 gap-3">
+        {metrics.map((m) => (
+          <MetricCard
+            key={m}
+            metric={m}
+            train={modelData.train[m] ?? 0}
+            test={modelData.test[m] ?? 0}
+          />
+        ))}
+      </div>
+      <div className="flex flex-wrap gap-2 mt-3">
+        {metrics.map((m) => (
+          <span key={m} className="text-xs text-gray-500">
+            {m}:{" "}
+            <OverfitBadge
+              metric={m}
+              train={modelData.train[m] ?? 0}
+              test={modelData.test[m] ?? 0}
+            />
+          </span>
+        ))}
+      </div>
+    </>
+  );
+}
 
-const DISPLAY_METRICS: Metric[] = ["MAE", "RMSE", "sMAPE", "R2"];
-
-// mode best: tampil dua model ensemble side by side
 function EnsembleCompare({
   varName,
-  models,
+  ensembleKey,
   data,
 }: {
   varName: string;
-  models: string[];
+  ensembleKey: string;
   data: OverfitData;
 }) {
+  const current = data[varName]?.[ensembleKey];
+  if (!current)
+    return (
+      <p className="text-sm text-gray-400">
+        Data ensemble belum tersedia untuk {varName}.
+      </p>
+    );
   return (
-    <div className="space-y-6">
-      {models.map((model) => {
-        const current = data[varName]?.[model];
-        if (!current)
-          return (
-            <p key={model} className="text-sm text-gray-400">
-              {model}: data tidak tersedia.
-            </p>
-          );
-        return (
-          <div key={model}>
-            <p className="text-sm font-semibold text-teal-700 mb-3">{model}</p>
-            <div className="grid grid-cols-2 gap-3">
-              {(Object.keys(current.train) as Metric[])
-                .filter((m) => !EXCLUDE_KEYS.includes(m))
-                .map((m) => (
-                  <MetricCard
-                    key={m}
-                    metric={m}
-                    train={current.train[m] ?? 0}
-                    test={current.test[m] ?? 0}
-                  />
-                ))}
-            </div>
-            <div className="flex flex-wrap gap-2 mt-3">
-              {(Object.keys(current.train) as Metric[])
-                .filter((m) => !EXCLUDE_KEYS.includes(m))
-                .map((m) => (
-                  <span key={m} className="text-xs text-gray-500">
-                    {m}:{" "}
-                    <OverfitBadge
-                      metric={m}
-                      train={current.train[m] ?? 0}
-                      test={current.test[m] ?? 0}
-                    />
-                  </span>
-                ))}
-            </div>
-          </div>
-        );
-      })}
+    <div>
+      <p className="text-sm font-semibold text-teal-700 mb-3">
+        {ensembleKey.replace("+", " + ")}
+      </p>
+      <MetricGrid modelData={current} />
     </div>
   );
 }
@@ -197,7 +199,14 @@ export default function OverfitChart({
   const [error, setError] = useState("");
   const [selectedVar, setSelectedVar] = useState("");
   const [selectedModel, setSelectedModel] = useState("");
-  const [selectedEnsembleModel, setSelectedEnsembleModel] = useState("");
+
+  // ✅ memory: ingat model yang dipilih per-var, tidak reset saat ganti var
+  const modelMemory = useRef<Record<string, string>>({});
+
+  const setSelectedModelWithMemory = (varName: string, model: string) => {
+    modelMemory.current[varName] = model;
+    setSelectedModel(model);
+  };
 
   useEffect(() => {
     fetch("http://localhost:5000/overfit_metrics", { credentials: "include" })
@@ -208,7 +217,6 @@ export default function OverfitChart({
           return;
         }
 
-        // handle both response shapes (breaking change safe)
         const metrics: OverfitData = json.metrics ?? json;
         const components: Record<string, string[]> =
           json.ensemble_components ?? {};
@@ -219,21 +227,46 @@ export default function OverfitChart({
         const firstVar =
           selectedVarProp && metrics[selectedVarProp]
             ? selectedVarProp
-            : (Object.keys(metrics)[0] ?? "");
-        const firstModel = Object.keys(metrics[firstVar] ?? {})[0] ?? "";
+            : (VAR_ORDER.find((v) => metrics[v]) ??
+              Object.keys(metrics)[0] ??
+              "");
+
+        // ✅ filter ensemble key dari default model
+        const firstModel =
+          modelMemory.current[firstVar] ??
+          Object.keys(metrics[firstVar] ?? {}).find((m) => !m.includes("+")) ??
+          "";
+
         setSelectedVar(firstVar);
-        setSelectedModel(firstModel);
+        setSelectedModelWithMemory(firstVar, firstModel);
       })
       .catch(() => setError("Gagal fetch data overfit."))
       .finally(() => setLoading(false));
   }, [selectedVarProp]);
 
-  const vars = Object.keys(data);
-  const models = Object.keys(data[selectedVar] ?? {});
+  const vars = Object.keys(data).sort(
+    (a, b) => VAR_ORDER.indexOf(a) - VAR_ORDER.indexOf(b),
+  );
+
+  // ✅ filter ensemble key dari dropdown model general
+  const models = Object.keys(data[selectedVar] ?? {}).filter(
+    (m) => !m.includes("+"),
+  );
+
   const current = data[selectedVar]?.[selectedModel];
 
-  // mode best: model yang dipakai ensemble untuk selectedVar
-  const bestModels = ensembleComponents[selectedVar] ?? [];
+  // ✅ displayMetrics dinamis dari data aktual (handle WD10M circular metrics)
+  const displayMetrics = current
+    ? Object.keys(current.train).filter((m) => !EXCLUDE_KEYS.has(m))
+    : ["MAE", "RMSE", "sMAPE", "R2"];
+
+  // ensemble key untuk mode best
+  const ensembleKey = (() => {
+    const components = ensembleComponents[selectedVar];
+    if (!components || components.length < 2) return null;
+    const key = components.join("+");
+    return data[selectedVar]?.[key] ? key : null;
+  })();
 
   if (loading)
     return <div className="text-sm text-gray-400 p-6">Memuat data...</div>;
@@ -254,10 +287,15 @@ export default function OverfitChart({
           <select
             value={selectedVar}
             onChange={(e) => {
-              setSelectedVar(e.target.value);
-              setSelectedModel(
-                Object.keys(data[e.target.value] ?? {})[0] ?? "",
+              const newVar = e.target.value;
+              setSelectedVar(newVar);
+              const nonEnsemble = Object.keys(data[newVar] ?? {}).filter(
+                (m) => !m.includes("+"),
               );
+              // ✅ hanya pakai memory kalau user pernah pilih (bukan dari pre-fill)
+              const remembered = modelMemory.current[newVar];
+              const fallback = nonEnsemble[0] ?? "";
+              setSelectedModelWithMemory(newVar, remembered ?? fallback);
             }}
             className="border border-gray-200 text-black rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
           >
@@ -268,11 +306,13 @@ export default function OverfitChart({
             ))}
           </select>
 
-          {/* model dropdown — hanya general */}
+          {/* model dropdown — hanya general, tanpa ensemble key */}
           {mode === "general" && (
             <select
               value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
+              onChange={(e) =>
+                setSelectedModelWithMemory(selectedVar, e.target.value)
+              }
               className="border border-gray-200 text-black rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-500"
             >
               {models.map((m) => (
@@ -305,10 +345,10 @@ export default function OverfitChart({
 
       {/* CONTENT */}
       {mode === "best" ? (
-        bestModels.length > 0 ? (
+        ensembleKey ? (
           <EnsembleCompare
             varName={selectedVar}
-            models={bestModels}
+            ensembleKey={ensembleKey}
             data={data}
           />
         ) : (
@@ -319,7 +359,7 @@ export default function OverfitChart({
       ) : current ? (
         <>
           <div className="grid grid-cols-2 gap-3">
-            {DISPLAY_METRICS.map((m) => (
+            {displayMetrics.map((m) => (
               <MetricCard
                 key={m}
                 metric={m}
@@ -329,7 +369,7 @@ export default function OverfitChart({
             ))}
           </div>
           <div className="flex flex-wrap gap-2 mt-4">
-            {DISPLAY_METRICS.map((m) => (
+            {displayMetrics.map((m) => (
               <span key={m} className="text-xs text-gray-500">
                 {m}:{" "}
                 <OverfitBadge
