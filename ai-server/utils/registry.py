@@ -1,7 +1,7 @@
 import os
 import json
 import hashlib
-from config import MODEL_FOLDER
+from config import MODEL_FOLDER, USER_FOLDER
 
 
 # =========================
@@ -16,9 +16,18 @@ def compute_file_hash(path: str, chunk_size: int = 65536) -> str:
 
 
 # =========================
-# MODEL DIR PER USER
+# MODEL DIR PER USER (aktif)
 # =========================
 def get_model_dir_for_user(username: str) -> str:
+    """Model aktif — users/<username>/"""
+    return os.path.join(USER_FOLDER, username)
+
+
+# =========================
+# SNAP DIR PER USER (backup)
+# =========================
+def get_snap_dir_for_user(username: str) -> str:
+    """Snapshot/backup — models/snap_<username>/"""
     return os.path.join(MODEL_FOLDER, f"snap_{username}")
 
 

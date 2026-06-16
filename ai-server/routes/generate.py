@@ -92,7 +92,7 @@ def _worker_generate_full(
     from training.feature_engineering import load_and_engineer
 
     # ✅ Load model per variabel
-    gbr, xgb, knn, scaler, FEATURES = load_ml_for_var(selected_var)
+    gbr, xgb, knn, scaler, FEATURES = load_ml_for_var(selected_var, username=username)
     print("ML FEATURES =", FEATURES)
     ML_READY = all(
         [
@@ -108,7 +108,7 @@ def _worker_generate_full(
     df_var = load_and_engineer(dataset_path, target_var=selected_var)
     X = np.array(df_var[FEATURES].values) if ML_READY else np.array([])
 
-    dl_state = load_dl_for_var(df_var, selected_var)
+    dl_state = load_dl_for_var(df_var, selected_var, username=username)
     DL_READY = dl_state["DL_READY"]
     lstm = dl_state["lstm"]
     bilstm = dl_state["bilstm"]
@@ -455,9 +455,9 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
             print(f"🚀 Processing {var} ({var_idx+1}/{len(TRAIN_VARS)})")
             print(f"{'='*50}")
 
-            gbr, xgb, knn, scaler, FEATURES = load_ml_for_var(var)
+            gbr, xgb, knn, scaler, FEATURES = load_ml_for_var(var, username=username)
             df_var = load_and_engineer(dataset_path, target_var=var)
-            dl_state = load_dl_for_var(df_var, var)
+            dl_state = load_dl_for_var(df_var, var, username=username)
             DL_READY = dl_state["DL_READY"]
             scaler_X = dl_state["scaler_X"]
             scaler_y = dl_state["scaler_y"]
@@ -494,8 +494,15 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
                 else f"lstm_{var}.h5"
             )
             print(f"🤖 Best DL [{var}]: {best_dl_name}")
+            
+            user_model_dir = (
+                os.path.join(USER_FOLDER, username)
+                if username
+                else MODEL_FOLDER
+            )
 
-            _lstm = _load(os.path.join(MODEL_FOLDER, dl_filename))
+
+            _lstm = _load(os.path.join(user_model_dir, dl_filename))
             _dl_cols = (
                 DL_INPUT_COLS
                 if DL_INPUT_COLS

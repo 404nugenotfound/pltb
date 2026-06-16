@@ -105,18 +105,22 @@ def upload_dataset():
     already_trained, file_hash = is_dataset_already_trained(final_path, username)
 
     if settings["model_cache"] and already_trained:
-        snap_dir = get_model_dir_for_user(username)
-        registry = load_model_registry(username)
-        entry = registry.get(file_hash, {})
+        model_dir = get_model_dir_for_user(username)   # users/<username>/
+        snap_dir  = get_snap_dir_for_user(username)    # models/snap_<username>/
+        registry  = load_model_registry(username)
+        entry     = registry.get(file_hash, {})
 
+        # Restore dari snap ke model aktif (users/<username>/)
         if os.path.exists(snap_dir):
+            os.makedirs(model_dir, exist_ok=True)
             for fname in os.listdir(snap_dir):
                 shutil.copy2(
-                    os.path.join(snap_dir, fname), os.path.join(MODEL_FOLDER, fname)
+                    os.path.join(snap_dir, fname),
+                    os.path.join(model_dir, fname)
                 )
 
-        reload_all_globals(final_path, username=username)  # ← TAMBAH INI
-        
+        reload_all_globals(final_path, username=username)
+
         return jsonify(
             {
                 "status": "skipped",

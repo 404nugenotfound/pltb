@@ -3,10 +3,10 @@ import joblib
 import traceback
 import numpy as np
 from sklearn.preprocessing import MinMaxScaler
-from config import MODEL_FOLDER, TARGET, STEP, TRAIN_VARS
+from config import MODEL_FOLDER, TARGET, STEP, TRAIN_VARS, USER_FOLDER
 
 
-def train_dl_models(df, target_var: str = None, cancel_check=None):
+def train_dl_models(df, target_var: str = None, cancel_check=None, username=""):
     if target_var is None:
         target_var = TARGET
 
@@ -15,6 +15,15 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
         from tensorflow.keras.models import Sequential
         from tensorflow.keras.layers import LSTM as KerasLSTM, Bidirectional, Dense, Dropout
         from tensorflow.keras.callbacks import EarlyStopping, Callback
+
+        # =========================
+        # PATH SETUP
+        # =========================
+        user_model_dir = os.path.join(USER_FOLDER, username)
+        os.makedirs(user_model_dir, exist_ok=True)
+
+        def save_path(filename):
+            return os.path.join(user_model_dir, filename)
 
         # ✅ Paksa CPU saja — hindari GPU memory conflict antar thread
         tf.config.set_visible_devices([], 'GPU')
@@ -42,7 +51,7 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
         if target_var == "WD10M":
             y_sin = np.sin(np.deg2rad(df[target_var].values))
             y_cos = np.cos(np.deg2rad(df[target_var].values))
-            y_all = np.stack([y_sin, y_cos], axis=1)  # shape (n, 2)
+            y_all = np.stack([y_sin, y_cos], axis=1)
         else:
             y_all = df[target_var].values.reshape(-1, 1)
 
@@ -58,17 +67,15 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
             scaler_y.fit(y_all[:split_scaler])
             y_scaled = scaler_y.transform(y_all).astype(np.float32)
 
-        # ✅ Vectorized sequence building — jauh lebih cepat dari loop Python
         n        = len(X_scaled)
         indices  = np.arange(STEP, n)
         seqs     = np.array([X_scaled[i - STEP:i] for i in indices], dtype=np.float32)
         targets  = y_scaled[STEP:]
 
         n_feat = seqs.shape[2]
-        n_out  = 2 if target_var == "WD10M" else 1 
+        n_out  = 2 if target_var == "WD10M" else 1
         suffix = f"_{target_var}"
 
-        # ✅ Split train/val manual — lebih efisien dari validation_split
         split_train = int(len(seqs) * 0.8)
         split_val   = int(len(seqs) * 0.9)
 
@@ -77,34 +84,31 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
 
         es = EarlyStopping(
             monitor="val_loss",
-            patience=3,                # ✅ tetap 5 — cukup untuk 87K rows
+            patience=3,
             restore_best_weights=True,
-            min_delta=0.0001           # ✅ BARU: abaikan improvement terlalu kecil
+            min_delta=0.0001
         )
 
         callbacks = [es]
         if cancel_check:
             callbacks.append(CancelCallback(cancel_check))
 
-        # ✅ Fungsi build model — hindari duplikasi kode
+        # =========================
+        # LSTM
+        # =========================
         def build_and_train(model, name):
             model.compile(optimizer="adam", loss="mse")
             model.fit(
                 X_train, y_train,
                 validation_data=(X_val, y_val),
-                epochs=15,             # ✅ naik dari 10 → 15, beri ruang konvergen
-                batch_size=512,        # ✅ tetap 512, oke untuk 87K rows
+                epochs=15,
+                batch_size=512,
                 callbacks=callbacks,
                 verbose=1
             )
-            model.save(f"{MODEL_FOLDER}/{name}{suffix}.h5")
+            model.save(save_path(f"{name}{suffix}.h5"))  # ✅ per-user
             print(f"✅ {name}{suffix} disimpan")
 
-        # =========================
-        # LSTM
-        # ✅ Diperkuat: n_feat ~26 + STEP=48, 2 layer
-        # =========================
-        # LSTM — 2 layer
         lstm = Sequential([
             KerasLSTM(86, return_sequences=True, input_shape=(STEP, n_feat)),
             Dropout(0.2),
@@ -115,13 +119,11 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
         ])
         build_and_train(lstm, "lstm")
 
-        # ✅ Clear session sebelum build model berikutnya — bebaskan memory
         tf.keras.backend.clear_session()
 
         # =========================
         # BiLSTM
         # =========================
-        # BiLSTM — tetap seperti sekarang, ga diubah
         bilstm = Sequential([
             Bidirectional(KerasLSTM(32, input_shape=(STEP, n_feat))),
             Dropout(0.3),
@@ -129,13 +131,12 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
             Dense(n_out)
         ])
 
-        # ✅ Reload callbacks karena clear_session
         callbacks = [
             EarlyStopping(
                 monitor="val_loss",
-                patience=3,            # ✅ tetap 3 — cukup untuk 87K rows
+                patience=3,
                 restore_best_weights=True,
-                min_delta=0.0001       # ✅ BARU: sama seperti LSTM
+                min_delta=0.0001
             )
         ]
         if cancel_check:
@@ -145,20 +146,22 @@ def train_dl_models(df, target_var: str = None, cancel_check=None):
         bilstm.fit(
             X_train, y_train,
             validation_data=(X_val, y_val),
-            epochs=15,                 # ✅ naik dari 10 → 15
-            batch_size=512,            # ✅ tetap 512
+            epochs=15,
+            batch_size=512,
             callbacks=callbacks,
             verbose=1
         )
-        bilstm.save(f"{MODEL_FOLDER}/bilstm{suffix}.h5")
+        bilstm.save(save_path(f"bilstm{suffix}.h5"))  # ✅ per-user
         print(f"✅ bilstm{suffix} disimpan")
 
-        # ✅ Simpan scaler dan dl_cols
-        joblib.dump(scaler_X, f"{MODEL_FOLDER}/scaler_X{suffix}.pkl")
+        # =========================
+        # SIMPAN SCALER & METADATA
+        # =========================
+        joblib.dump(scaler_X, save_path(f"scaler_X{suffix}.pkl"))  # ✅ per-user
         if scaler_y is not None:
-            joblib.dump(scaler_y, f"{MODEL_FOLDER}/scaler_y{suffix}.pkl")
-        joblib.dump(target_var == "WD10M", f"{MODEL_FOLDER}/is_circular{suffix}.pkl")
-        joblib.dump(dl_cols,  f"{MODEL_FOLDER}/dl_cols{suffix}.pkl")
+            joblib.dump(scaler_y, save_path(f"scaler_y{suffix}.pkl"))
+        joblib.dump(target_var == "WD10M", save_path(f"is_circular{suffix}.pkl"))
+        joblib.dump(dl_cols,               save_path(f"dl_cols{suffix}.pkl"))
 
         print(f"✅ DL training selesai untuk {target_var}")
         return True

@@ -8,9 +8,9 @@
   "history": [
     {
       "entry": {
-        "id": 1780829196636,
-        "waktu": "7/6/2026, 17.46.36",
-        "file": "POWER_Point_Hourly_SUKABUMI_TESTING.csv",
+        "id": 1781620363998,
+        "waktu": "16/6/2026, 21.32.43",
+        "file": "NASA_Baron_Hourly.csv",
         "algo": "XGB-LSTM",
         "periode": "1 Jam",
         "hasil": [
@@ -20,24 +20,7 @@
           }
         ],
         "status": "Selesai",
-        "nlp_report": "Ringkasan prediksi cuaca untuk periode 01-01-2023 hingga 08-01-2023:\n\n\u25b8 Kecepatan angin (WS10M): rata-rata 3.34 m/s, kategori angin sedang, tren menurun menuju akhir periode. Tertinggi 5.23 m/s, terendah 2.44 m/s. Puncak pukul 09:00, terendah pukul 04:00. Model: XGB-BiLSTM [WS10M] | MAPE 4.72% | RMSE 0.165 (akurasi tinggi).\n\n\u25b8 Arah angin (WD10M): rata-rata 114.32 derajat, kategori dari timur, tren menurun menuju akhir periode. Tertinggi 360.00 derajat, terendah 65.98 derajat. Puncak pukul 12:00, terendah pukul 04:00. Model: XGB-LSTM [WD10M] | MAPE 79.66% | RMSE 149.609 (akurasi rendah).\n\n\u25b8 Kelembaban udara (RH2M): rata-rata 14.59 %, kategori sangat kering, tren menurun menuju akhir periode. Tertinggi 53.13 %, terendah 0.00 %. Puncak pukul 16:00, terendah pukul 05:00. Model: XGB-BiLSTM [RH2M] | MAPE 108.88% | RMSE 92.462 (akurasi rendah).\n\n\nRata-rata MAPE keseluruhan: 64.42% \u2014 tingkat akurasi prediksi tergolong rendah."
-      }
-    },
-    {
-      "entry": {
-        "id": 1780735339356,
-        "waktu": "6/6/2026, 15.42.19",
-        "file": "NASA_Pandeglang_Hourly.csv",
-        "algo": "XGB-LSTM",
-        "periode": "1 Jam",
-        "hasil": [
-          {
-            "label": "BiLSTM:",
-            "value": "14.30 MW"
-          }
-        ],
-        "status": "Selesai",
-        "nlp_report": "Prediksi kecepatan angin untuk periode 01-01-2023 hingga 08-01-2023 menunjukkan rata-rata 3.52 m/s, termasuk kategori angin sedang. Nilai tertinggi mencapai 8.99 m/s dan terendah 1.74 m/s, dengan standar deviasi 1.60 m/s. Nilai cenderung paling tinggi sekitar pukul 10:00 dan paling rendah sekitar pukul 22:00. Secara umum tren kecepatan angin menurun menuju akhir periode. \n\nModel terbaik adalah XGB-BiLSTM Stacking dengan MAPE 3.97% dan RMSE 0.175. Tingkat akurasi model tergolong tinggi."
+        "nlp_report": "Ringkasan prediksi cuaca untuk periode 01-01-2023 hingga 08-01-2023:\n\n\u25b8 Kecepatan angin (WS10M): rata-rata **1.19 m/s**, kategori **tenang (calm)**, tren relatif stabil sepanjang periode. Tertinggi **4.13 m/s**, terendah **0.00 m/s**. Puncak pukul **12:00**, terendah pukul **00:00**. Model: **XGB-BiLSTM [WS10M]** | sMAPE **8.16%** | RMSE **0.313** (akurasi **tinggi**).\n\n\u25b8 Arah angin (WD10M): rata-rata **240.86 derajat**, kategori **dari barat daya**, tren menurun menuju akhir periode. Tertinggi **291.73 derajat**, terendah **231.51 derajat**. Puncak pukul **07:00**, terendah pukul **02:00**. Model: **XGB-LSTM [WD10M]** | CircularMAE **2.495\u00b0** | Acc\u00b115\u00b0 **98.4%** (akurasi **tinggi**).\n\n\u25b8 Kelembaban udara (RH2M): rata-rata **73.22 %**, kategori **lembab**, tren meningkat menuju akhir periode. Tertinggi **86.84 %**, terendah **53.33 %**. Puncak pukul **04:00**, terendah pukul **15:00**. Model: **XGB-BiLSTM [RH2M]** | MAE **1.05%** | RMSE **1.433** (akurasi **tinggi**).\n\n\u25b8 Suhu udara (T2M): rata-rata **21.29 \u00b0C**, kategori **sejuk**, tren menurun menuju akhir periode. Tertinggi **27.52 \u00b0C**, terendah **18.77 \u00b0C**. Puncak pukul **10:00**, terendah pukul **23:00**. Model: **XGB-BiLSTM [T2M]** | sMAPE **0.97%** | RMSE **0.333** (akurasi **tinggi**).\n\n\u25b8 Tekanan atmosfer (PS): rata-rata **98.71 kPa**, kategori **rendah**, tren relatif stabil sepanjang periode. Tertinggi **99.33 kPa**, terendah **98.62 kPa**. Puncak pukul **07:00**, terendah pukul **23:00**. Model: **XGB-LSTM [PS]** | MAE **0.03%** | RMSE **0.033** (akurasi **tinggi**).\n\n\nRata-rata error keseluruhan: **2.55%** \u2014 tingkat akurasi prediksi tergolong **tinggi** (CircularMAE untuk arah angin, MAE/sMAPE untuk variabel lain).\n\nKlasifikasi lokasi: **Moderate** \u2014 pola atmosfer cukup konsisten dengan variasi dalam batas wajar untuk operasional PLTB. Hasil ini dapat digunakan sebagai referensi dalam perencanaan dan optimasi sistem PLTB."
       }
     }
   ],
@@ -147,20 +130,20 @@
         ],
         "XGB+BiLSTM": {
           "train": {
-            "MAE": 0.224,
-            "RMSE": 0.297,
-            "R2": 0.956,
-            "sMAPE": 7.9,
+            "MAE": 0.266,
+            "RMSE": 0.343,
+            "R2": 0.941,
+            "sMAPE": 8.59,
             "primary_metric": "sMAPE",
-            "primary_value": 7.9
+            "primary_value": 8.59
           },
           "test": {
-            "MAE": 0.219,
-            "RMSE": 0.291,
-            "R2": 0.95,
-            "sMAPE": 8.08,
+            "MAE": 0.238,
+            "RMSE": 0.313,
+            "R2": 0.943,
+            "sMAPE": 8.16,
             "primary_metric": "sMAPE",
-            "primary_value": 8.08
+            "primary_value": 8.16
           }
         }
       }
@@ -269,20 +252,20 @@
         ],
         "XGB+LSTM": {
           "train": {
-            "CircularMAE": 2.342,
-            "CircularRMSE": 6.063,
+            "CircularMAE": 2.339,
+            "CircularRMSE": 6.163,
             "CircularCorr": 0.995,
-            "Acc15": 98.5,
+            "Acc15": 98.47,
             "primary_metric": "CircularMAE",
-            "primary_value": 2.342
+            "primary_value": 2.339
           },
           "test": {
-            "CircularMAE": 2.536,
-            "CircularRMSE": 5.928,
-            "CircularCorr": 0.996,
-            "Acc15": 98.45,
+            "CircularMAE": 2.495,
+            "CircularRMSE": 5.972,
+            "CircularCorr": 0.995,
+            "Acc15": 98.39,
             "primary_metric": "CircularMAE",
-            "primary_value": 2.536
+            "primary_value": 2.495
           }
         }
       }
@@ -401,22 +384,22 @@
         ],
         "XGB+BiLSTM": {
           "train": {
-            "MAE": 1.406,
-            "RMSE": 1.917,
-            "R2": 0.967,
-            "sMAPE": 1.76,
-            "MAE_pct": 1.41,
+            "MAE": 1.156,
+            "RMSE": 1.569,
+            "R2": 0.978,
+            "sMAPE": 1.44,
+            "MAE_pct": 1.16,
             "primary_metric": "MAE",
-            "primary_value": 1.41
+            "primary_value": 1.16
           },
           "test": {
-            "MAE": 1.29,
-            "RMSE": 1.763,
-            "R2": 0.946,
-            "sMAPE": 1.55,
-            "MAE_pct": 1.29,
+            "MAE": 1.055,
+            "RMSE": 1.433,
+            "R2": 0.965,
+            "sMAPE": 1.26,
+            "MAE_pct": 1.05,
             "primary_metric": "MAE",
-            "primary_value": 1.29
+            "primary_value": 1.05
           }
         }
       }
@@ -525,20 +508,20 @@
         ],
         "XGB+BiLSTM": {
           "train": {
-            "MAE": 0.232,
-            "RMSE": 0.308,
-            "R2": 0.981,
-            "sMAPE": 0.89,
+            "MAE": 0.258,
+            "RMSE": 0.345,
+            "R2": 0.977,
+            "sMAPE": 0.98,
             "primary_metric": "sMAPE",
-            "primary_value": 0.89
+            "primary_value": 0.98
           },
           "test": {
-            "MAE": 0.214,
-            "RMSE": 0.283,
-            "R2": 0.975,
-            "sMAPE": 0.82,
+            "MAE": 0.253,
+            "RMSE": 0.333,
+            "R2": 0.965,
+            "sMAPE": 0.97,
             "primary_metric": "sMAPE",
-            "primary_value": 0.82
+            "primary_value": 0.97
           }
         }
       }
@@ -647,20 +630,20 @@
         ],
         "XGB+LSTM": {
           "train": {
-            "MAE": 0.022,
-            "RMSE": 0.028,
-            "R2": 0.978,
-            "EVS": 0.979,
+            "MAE": 0.03,
+            "RMSE": 0.038,
+            "R2": 0.959,
+            "EVS": 0.968,
             "primary_metric": "MAE",
-            "primary_value": 0.022
+            "primary_value": 0.03
           },
           "test": {
-            "MAE": 0.021,
-            "RMSE": 0.027,
-            "R2": 0.974,
-            "EVS": 0.974,
+            "MAE": 0.026,
+            "RMSE": 0.033,
+            "R2": 0.96,
+            "EVS": 0.962,
             "primary_metric": "MAE",
-            "primary_value": 0.021
+            "primary_value": 0.026
           }
         }
       }
@@ -668,7 +651,7 @@
   },
   "registry": {
     "4da17a6244eb71e914bd867889783c60": {
-      "trained_at": "2026-06-14T18:54:10.262229",
+      "trained_at": "2026-06-16T20:48:34.992278",
       "dataset": "NASA_Baron_Hourly.csv"
     }
   }

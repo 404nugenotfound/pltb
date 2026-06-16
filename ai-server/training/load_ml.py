@@ -1,28 +1,31 @@
+import os
 import joblib
 import numpy as np
-from config import MODEL_FOLDER, TARGET, TRAIN_VARS
+from config import MODEL_FOLDER, TARGET, TRAIN_VARS, USER_FOLDER
 
-def load_ml_models(suffix=""):
+
+def load_ml_models(suffix="", username=""):
+    user_model_dir = os.path.join(USER_FOLDER, username) if username else MODEL_FOLDER
+
     try:
-        gbr    = joblib.load(f"{MODEL_FOLDER}/gbr{suffix}.pkl")
-        xgb    = joblib.load(f"{MODEL_FOLDER}/xgb{suffix}.pkl")
-        knn    = joblib.load(f"{MODEL_FOLDER}/knn{suffix}.pkl")
-        scaler = joblib.load(f"{MODEL_FOLDER}/scaler{suffix}.pkl")
-        feats  = joblib.load(f"{MODEL_FOLDER}/features{suffix}.pkl")
+        gbr    = joblib.load(os.path.join(user_model_dir, f"gbr{suffix}.pkl"))
+        xgb    = joblib.load(os.path.join(user_model_dir, f"xgb{suffix}.pkl"))
+        knn    = joblib.load(os.path.join(user_model_dir, f"knn{suffix}.pkl"))
+        scaler = joblib.load(os.path.join(user_model_dir, f"scaler{suffix}.pkl"))
+        feats  = joblib.load(os.path.join(user_model_dir, f"features{suffix}.pkl"))
         return gbr, xgb, knn, scaler, feats
     except Exception as e:
         print(f"⚠️ Model ML{suffix} tidak tersedia: {e}")
         return None, None, None, None, []
 
-def init_ml_state(df):
-    # ✅ FIX: suffix dipakai, bukan dibuat lalu diabaikan
-    suffix = f"_{TARGET}"
-    gbr, xgb, knn, scaler, FEATURES = load_ml_models(suffix)
 
-    # Fallback ke model tanpa suffix kalau belum ada
+def init_ml_state(df, username=""):
+    suffix = f"_{TARGET}"
+    gbr, xgb, knn, scaler, FEATURES = load_ml_models(suffix, username=username)
+
     if gbr is None:
         print(f"⚠️ Model {suffix} tidak ada, fallback ke default")
-        gbr, xgb, knn, scaler, FEATURES = load_ml_models("")
+        gbr, xgb, knn, scaler, FEATURES = load_ml_models("", username=username)
 
     ML_READY = all([
         gbr is not None,
@@ -36,7 +39,7 @@ def init_ml_state(df):
         X       = np.array(df[FEATURES].values)
         y       = np.array(df[TARGET].values)
         data_ml = X[-1].reshape(1, -1)
-        print(f"✅ ML models loaded [{TARGET}]")
+        print(f"✅ ML models loaded [{TARGET}] untuk {username}")
     else:
         print("⚠️ ML models belum ada — upload dataset untuk training")
         X       = np.array([])
@@ -50,13 +53,14 @@ def init_ml_state(df):
         "X": X, "y": y, "data_ml": data_ml,
     }
 
-def load_ml_for_var(var: str):
+
+def load_ml_for_var(var: str, username=""):
     """Load model ML untuk variabel tertentu saat generate."""
     suffix = f"_{var}"
-    gbr, xgb, knn, scaler, feats = load_ml_models(suffix)
+    gbr, xgb, knn, scaler, feats = load_ml_models(suffix, username=username)
 
     if gbr is None:
         print(f"⚠️ Model untuk {var} tidak ada, fallback ke default")
-        gbr, xgb, knn, scaler, feats = load_ml_models("")
+        gbr, xgb, knn, scaler, feats = load_ml_models("", username=username)
 
     return gbr, xgb, knn, scaler, feats

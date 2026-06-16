@@ -13,13 +13,19 @@ def reload_all_globals(dataset_path, username: str = ""):  # ← tambah username
     # =========================
     # INIT ML
     # =========================
-    ml_state = init_ml_state(df)
+    ml_state = init_ml_state(
+        df,
+        username=username
+    )
 
     # =========================
     # INIT DL
     # =========================
-    # ✅ target_var=TARGET eksplisit
-    dl_state = init_dl_models(df, target_var=TARGET)
+    dl_state = init_dl_models(
+        df,
+        target_var=TARGET,
+        username=username
+    )
 
     # ✅ var_name=TARGET eksplisit
     metrics_ml, metrics_dl = load_or_compute_metrics(

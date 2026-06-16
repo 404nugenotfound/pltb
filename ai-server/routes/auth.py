@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 import json
 import os
+from config import USER_FOLDER
 from utils.recaptcha import verify_recaptcha
 from utils.progress import (
     generate_progress,
@@ -13,7 +14,6 @@ from utils.user_helpers import load_user, save_user, user_path
 auth_bp = Blueprint("auth_bp", __name__)
 
 ADMINS_FILE = "admins.json"
-USERS_DIR   = "users"  # folder penyimpanan per-user
 
 # Default admin
 DEFAULT_ADMINS = [
@@ -49,17 +49,17 @@ def delete_user(username: str) -> bool:
 
 
 def load_all_users() -> list[dict]:
-    """Load semua user dari folder USERS_DIR."""
-    if not os.path.exists(USERS_DIR):
+    """Load semua user dari folder USER_FOLDER."""
+    if not os.path.exists(USER_FOLDER):
         return []
     users = []
-    for filename in os.listdir(USERS_DIR):
+    for filename in os.listdir(USER_FOLDER):
         if filename.endswith(".json"):
-            with open(os.path.join(USERS_DIR, filename), "r") as f:
+            with open(os.path.join(USER_FOLDER, filename), "r") as f:
                 try:
                     users.append(json.load(f))
                 except json.JSONDecodeError:
-                    pass  # skip file rusak
+                    pass
     return users
 
 
@@ -72,10 +72,10 @@ def username_exists(username: str) -> bool:
 
 def email_exists(email: str, exclude_username: str = "") -> bool:
     """Cek apakah email sudah dipakai user lain."""
-    for filename in os.listdir(USERS_DIR) if os.path.exists(USERS_DIR) else []:
+    for filename in os.listdir(USER_FOLDER) if os.path.exists(USER_FOLDER) else []:
         if not filename.endswith(".json"):
             continue
-        with open(os.path.join(USERS_DIR, filename), "r") as f:
+        with open(os.path.join(USER_FOLDER, filename), "r") as f:
             try:
                 u = json.load(f)
                 if u.get("email") == email and u["username"] != exclude_username:

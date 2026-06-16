@@ -78,7 +78,7 @@ def worker_retrain(username, dataset_path, train_progress, train_lock):
             y_var = np.array(df_var[var].values)
 
             log(f"🔧 Training ML untuk {var} | features={features}...")
-            train_ml_models(X_var, y_var, features, suffix=f"_{var}")
+            train_ml_models(X_var, y_var, features, suffix=f"_{var}", username=username)
 
             if is_cancelled():
                 raise InterruptedError("Training dibatalkan user")
@@ -101,7 +101,7 @@ def worker_retrain(username, dataset_path, train_progress, train_lock):
             # ✅ DL pakai df_var yang sudah di-engineer per variabel
             df_var = load_and_engineer(dataset_path, target_var=var)
 
-            dl_ok = train_dl_models(df_var, target_var=var, cancel_check=is_cancelled)
+            dl_ok = train_dl_models(df_var, target_var=var, cancel_check=is_cancelled, username=username)
 
             if is_cancelled():
                 raise InterruptedError("Training dibatalkan user")
@@ -125,7 +125,7 @@ def worker_retrain(username, dataset_path, train_progress, train_lock):
                 # ✅ Load df per variabel untuk metrics
                 df_var = load_and_engineer(dataset_path, target_var=var)
 
-                gbr_v, xgb_v, knn_v, scaler_v, feats_v = load_ml_models(f"_{var}")
+                gbr_v, xgb_v, knn_v, scaler_v, feats_v = load_ml_models(f"_{var}", username=username)
                 ML_READY_V = all(
                     [
                         gbr_v is not None,
@@ -139,7 +139,7 @@ def worker_retrain(username, dataset_path, train_progress, train_lock):
                 X_v = np.array(df_var[feats_v].values) if ML_READY_V else np.array([])
                 y_v = np.array(df_var[var].values)
 
-                dl_state_v = init_dl_models(df_var, target_var=var)
+                dl_state_v = init_dl_models(df_var, target_var=var, username=username)
                 DL_READY_V = dl_state_v["DL_READY"]
                 X_scaled_v = dl_state_v["X_scaled"]
                 scaler_y_v = dl_state_v["scaler_y"]
@@ -175,16 +175,36 @@ def worker_retrain(username, dataset_path, train_progress, train_lock):
             raise InterruptedError("Training dibatalkan user")
 
         log("💾 Simpan registry...")
+
         file_hash = compute_file_hash(dataset_path)
-        snap_dir = get_model_dir_for_user(username)
+
+        # Folder model aktif user
+        model_dir = get_model_dir_for_user(username)
+
+        # Folder snapshot cache user
+        snap_dir = get_snap_dir_for_user(username)
+
+        os.makedirs(model_dir, exist_ok=True)
         os.makedirs(snap_dir, exist_ok=True)
 
-        for fname in os.listdir(MODEL_FOLDER):
-            src = os.path.join(MODEL_FOLDER, fname)
+        # Bersihkan snapshot lama
+        for fname in os.listdir(snap_dir):
+            fpath = os.path.join(snap_dir, fname)
+            if os.path.isfile(fpath):
+                os.remove(fpath)
+
+        # Copy model aktif -> snapshot cache
+        for fname in os.listdir(model_dir):
+            src = os.path.join(model_dir, fname)
+
             if os.path.isfile(src):
-                shutil.copy2(src, os.path.join(snap_dir, fname))
+                shutil.copy2(
+                    src,
+                    os.path.join(snap_dir, fname)
+                )
 
         save_model_registry(username, file_hash, dataset_path)
+
         log("✅ Registry disimpan")
 
         # =========================

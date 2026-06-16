@@ -2,63 +2,57 @@ import os
 import traceback
 import joblib
 import numpy as np
-
-from config import (
-    MODEL_FOLDER,
-    TARGET,
-    STEP
-)
+from config import MODEL_FOLDER, TARGET, STEP, USER_FOLDER
 
 
-def init_dl_models(df_ref, target_var: str = None):
-
+def init_dl_models(df_ref, target_var: str = None, username=""):
     if target_var is None:
         target_var = TARGET
 
     suffix = f"_{target_var}"
 
+    # =========================
+    # PATH SETUP
+    # =========================
+    user_model_dir = os.path.join(USER_FOLDER, username) if username else MODEL_FOLDER
+
     try:
         from tensorflow.keras.models import load_model
+        print(f"📦 Load DL model untuk {target_var} | user={username}")
 
-        print(f"📦 Load DL model untuk {target_var}...")
+        lstm_path    = os.path.join(user_model_dir, f"lstm{suffix}.h5")
+        bilstm_path  = os.path.join(user_model_dir, f"bilstm{suffix}.h5")
+        scalerX_path = os.path.join(user_model_dir, f"scaler_X{suffix}.pkl")
+        scalery_path = os.path.join(user_model_dir, f"scaler_y{suffix}.pkl")
+        dlcols_path  = os.path.join(user_model_dir, f"dl_cols{suffix}.pkl")
 
-        # coba load dengan suffix dulu, fallback ke tanpa suffix
-        lstm_path   = os.path.join(MODEL_FOLDER, f"lstm{suffix}.h5")
-        bilstm_path = os.path.join(MODEL_FOLDER, f"bilstm{suffix}.h5")
-        scalerX_path = os.path.join(MODEL_FOLDER, f"scaler_X{suffix}.pkl")
-        scalery_path = os.path.join(MODEL_FOLDER, f"scaler_y{suffix}.pkl")
-        dlcols_path  = os.path.join(MODEL_FOLDER, f"dl_cols{suffix}.pkl")
-
-        # fallback ke model lama tanpa suffix
+        # Fallback ke model tanpa suffix
         if not os.path.exists(lstm_path):
-            lstm_path   = os.path.join(MODEL_FOLDER, "lstm.h5")
-            bilstm_path = os.path.join(MODEL_FOLDER, "bilstm.h5")
-            scalerX_path = os.path.join(MODEL_FOLDER, "scaler_X.pkl")
-            scalery_path = os.path.join(MODEL_FOLDER, "scaler_y.pkl")
+            lstm_path    = os.path.join(user_model_dir, "lstm.h5")
+            bilstm_path  = os.path.join(user_model_dir, "bilstm.h5")
+            scalerX_path = os.path.join(user_model_dir, "scaler_X.pkl")
+            scalery_path = os.path.join(user_model_dir, "scaler_y.pkl")
             dlcols_path  = None
             print(f"⚠️ Model {target_var} tidak ada, fallback ke default")
 
-        lstm   = load_model(lstm_path)
-        bilstm = load_model(bilstm_path)
-
+        lstm     = load_model(lstm_path)
+        bilstm   = load_model(bilstm_path)
         scaler_X = joblib.load(scalerX_path)
-        circular_path = os.path.join(MODEL_FOLDER, f"is_circular{suffix}.pkl")
-        is_circular = joblib.load(circular_path) if os.path.exists(circular_path) else False
+
+        circular_path = os.path.join(user_model_dir, f"is_circular{suffix}.pkl")
+        is_circular   = joblib.load(circular_path) if os.path.exists(circular_path) else False
 
         if is_circular:
             scaler_y = None
         else:
             scaler_y = joblib.load(scalery_path) if os.path.exists(scalery_path) else None
 
-        # load dl_cols
         if dlcols_path and os.path.exists(dlcols_path):
             dl_cols = joblib.load(dlcols_path)
         elif hasattr(scaler_X, "feature_names_in_"):
             dl_cols = list(scaler_X.feature_names_in_)
         else:
             dl_cols = [c for c in df_ref.columns if c != target_var]
-            
-
 
         missing = [c for c in dl_cols if c not in df_ref.columns]
         if missing:
@@ -73,7 +67,6 @@ def init_dl_models(df_ref, target_var: str = None):
             raise ValueError(f"Data kurang dari STEP ({STEP})")
 
         data_seq = X_scaled[-STEP:].reshape(1, STEP, X_scaled.shape[1])
-
         print(f"✅ DL siap untuk {target_var} | shape={X_scaled.shape}")
 
         return {
@@ -104,6 +97,6 @@ def init_dl_models(df_ref, target_var: str = None):
         }
 
 
-def load_dl_for_var(df_ref, var: str):
+def load_dl_for_var(df_ref, var: str, username=""):
     """Load DL models untuk variabel tertentu saat generate."""
-    return init_dl_models(df_ref, target_var=var)
+    return init_dl_models(df_ref, target_var=var, username=username)
