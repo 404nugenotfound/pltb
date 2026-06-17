@@ -1,17 +1,20 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useSaveHistory } from "@/app/hooks/useSaveHistory";
+import type { ForecastData } from "@/app/components/overview/ForecastChart";
 
 interface Props {
   datasetName: string;
   generateMode: "general" | "best";
   nlpReport: string;
+  forecastData?: object | null;
 }
 
 export default function OverviewHeader({
   datasetName,
   generateMode,
   nlpReport,
+  forecastData,
 }: Props) {
   const { saveHistory } = useSaveHistory();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
@@ -44,6 +47,7 @@ export default function OverviewHeader({
                 periode: "1 Jam",
                 hasil: [{ label: "BiLSTM:", value: "14.30 MW" }],
                 nlp_report: nlpReport,
+                forecast_data: forecastData ?? null,
                 onStorageFull: () => setShowUpgradeModal(true),
               })
             }

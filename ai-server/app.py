@@ -19,6 +19,7 @@ from routes.history import history_bp
 from routes.cache_settings import (
     cache_settings_bp
 )
+from routes.snapshot import snapshot_bp
 
 # =========================
 # UTILS
@@ -76,6 +77,8 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(history_bp)
 
 app.register_blueprint(cache_settings_bp)
+
+app.register_blueprint(snapshot_bp)
 
 # =========================
 # LOAD DATASET

@@ -27,6 +27,10 @@ def worker_retrain(username, dataset_path, train_progress, train_lock):
         with train_lock:
             return train_progress.get(username, {}).get("cancel", False)
 
+    def get_skip_snapshot():
+        with train_lock:
+            return train_progress.get(username, {}).get("skip_snapshot", False)
+
     try:
         # =========================
         # LOAD DATASET RAW
@@ -37,7 +41,6 @@ def worker_retrain(username, dataset_path, train_progress, train_lock):
 
         df_raw = pd.read_csv(dataset_path)
 
-        # Validasi kolom wajib ada
         missing_cols = [c for c in REQUIRED_COLUMNS if c not in df_raw.columns]
         if missing_cols:
             raise ValueError(f"Kolom wajib tidak ditemukan: {missing_cols}")
@@ -59,7 +62,6 @@ def worker_retrain(username, dataset_path, train_progress, train_lock):
 
             log(f"🔧 Feature engineering untuk {var}...")
 
-            # ✅ Feature engineering per variabel — lag dari kolom var itu sendiri
             df_var = load_and_engineer(dataset_path, target_var=var)
 
             extra_cols = [
@@ -98,7 +100,6 @@ def worker_retrain(username, dataset_path, train_progress, train_lock):
 
             log(f"🔧 Training DL untuk {var}...")
 
-            # ✅ DL pakai df_var yang sudah di-engineer per variabel
             df_var = load_and_engineer(dataset_path, target_var=var)
 
             dl_ok = train_dl_models(df_var, target_var=var, cancel_check=is_cancelled, username=username)
@@ -116,13 +117,14 @@ def worker_retrain(username, dataset_path, train_progress, train_lock):
         from training.load_ml import load_ml_models
         from training.load_dl import init_dl_models
 
+        all_metrics = {}  # ← kumpulin metrics semua var buat disimpan ke snapshot
+
         for var in TRAIN_VARS:
             if var not in df_raw.columns:
                 log(f"⚠️ Skip metrics {var} — kolom tidak ada")
                 continue
 
             try:
-                # ✅ Load df per variabel untuk metrics
                 df_var = load_and_engineer(dataset_path, target_var=var)
 
                 gbr_v, xgb_v, knn_v, scaler_v, feats_v = load_ml_models(f"_{var}", username=username)
@@ -143,8 +145,8 @@ def worker_retrain(username, dataset_path, train_progress, train_lock):
                 DL_READY_V = dl_state_v["DL_READY"]
                 X_scaled_v = dl_state_v["X_scaled"]
                 scaler_y_v = dl_state_v["scaler_y"]
-                lstm_v = dl_state_v["lstm"]
-                bilstm_v = dl_state_v["bilstm"]
+                lstm_v     = dl_state_v["lstm"]
+                bilstm_v   = dl_state_v["bilstm"]
 
                 ml_v, dl_v = load_or_compute_metrics(
                     ML_READY_V,
@@ -162,6 +164,8 @@ def worker_retrain(username, dataset_path, train_progress, train_lock):
                     var_name=var,
                     username=username,
                 )
+
+                all_metrics[var] = {"ml": ml_v, "dl": dl_v}  # ← simpan per var
                 log(f"✅ Metrics [{var}] ML={list(ml_v.keys())} DL={list(dl_v.keys())}")
 
             except Exception as e_metrics:
@@ -177,33 +181,28 @@ def worker_retrain(username, dataset_path, train_progress, train_lock):
         log("💾 Simpan registry...")
 
         file_hash = compute_file_hash(dataset_path)
-
-        # Folder model aktif user
-        model_dir = get_model_dir_for_user(username)
-
-        # Folder snapshot cache user
-        snap_dir = get_snap_dir_for_user(username)
-
-        os.makedirs(model_dir, exist_ok=True)
-        os.makedirs(snap_dir, exist_ok=True)
-
-        # Bersihkan snapshot lama
-        for fname in os.listdir(snap_dir):
-            fpath = os.path.join(snap_dir, fname)
-            if os.path.isfile(fpath):
-                os.remove(fpath)
-
-        # Copy model aktif -> snapshot cache
-        for fname in os.listdir(model_dir):
-            src = os.path.join(model_dir, fname)
-
-            if os.path.isfile(src):
-                shutil.copy2(
-                    src,
-                    os.path.join(snap_dir, fname)
-                )
+        skip_snapshot = get_skip_snapshot()
 
         save_model_registry(username, file_hash, dataset_path)
+
+        if not skip_snapshot:
+            log("📸 Simpan snapshot...")
+
+            # Cek apakah hash ini sudah punya snapshot (overwrite) atau baru
+            quota = check_snapshot_quota(username, file_hash)
+            existing_id = quota.get("existing_id")  # None kalau slot baru
+
+            snap_id = save_snapshot(
+                username=username,
+                file_hash=file_hash,
+                dataset_path=dataset_path,
+                metrics=all_metrics,
+                existing_id=existing_id,
+            )
+
+            log(f"✅ Snapshot disimpan: {snap_id}")
+        else:
+            log("⚠️ Skip snapshot (user pilih lanjut tanpa snapshot)")
 
         log("✅ Registry disimpan")
 

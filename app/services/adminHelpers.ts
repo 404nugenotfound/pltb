@@ -3,32 +3,10 @@ import { ResourceLimit, UserResourceLimit, User } from '../types/admin.types';
 
 export const DEFAULT_RESOURCE_LIMITS: ResourceLimit[] = [
   { 
-    id: 'forecast', 
-    featureName: 'Forecasting / Prediksi', 
-    dailyLimit: 10, 
-    monthlyLimit: 100, 
-    description: 'Prediksi kecepatan angin 1 jam ke depan' 
-  },
-  { 
-    id: 'analitik', 
-    featureName: 'Report Analytics', 
-    dailyLimit: 20, 
-    monthlyLimit: 200, 
-    description: 'Analisis report dan prakiraan 7 hari' 
-  },
-  { 
-    id: 'trends', 
-    featureName: 'Trends Reports', 
-    dailyLimit: 15, 
-    monthlyLimit: 150, 
-    description: 'Grafik tren suhu, kelembapan, dan angin' 
-  },
-  { 
-    id: 'export', 
-    featureName: 'Export Data', 
-    dailyLimit: 5, 
-    monthlyLimit: 50, 
-    description: 'Ekspor data ke CSV/Excel' 
+    id: 'storage', 
+    featureName: 'Penyimpanan', 
+    maxStorageMb: 10, 
+    description: 'Batas total penyimpanan pengguna (dalam MB)' 
   },
 ];
 
@@ -63,6 +41,8 @@ export const syncUsersFromAuth = (): User[] => {
         email: parsedAuthUser.email,
         registeredAt: parsedAuthUser.registeredAt || new Date().toISOString(),
         lastActive: new Date().toISOString(),
+        lastLogin: '',
+        lastLogout: '',
         usageCount: 0,
         location: 'Unknown',
         isActive: true,
@@ -82,6 +62,8 @@ export const getSampleUsers = (): User[] => [
     email: 'admin@ventara.id', 
     registeredAt: new Date().toISOString(), 
     lastActive: new Date().toISOString(), 
+    lastLogin: new Date().toISOString(),
+    lastLogout: '',
     usageCount: 45, 
     location: 'Jakarta', 
     isActive: true 
@@ -92,6 +74,8 @@ export const getSampleUsers = (): User[] => [
     email: 'kakang@example.com', 
     registeredAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), 
     lastActive: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), 
+    lastLogin: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    lastLogout: '',
     usageCount: 23, 
     location: 'Bawean', 
     isActive: true 
@@ -102,6 +86,8 @@ export const getSampleUsers = (): User[] => [
     email: 'joko@example.com', 
     registeredAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(), 
     lastActive: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(), 
+    lastLogin: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    lastLogout: '',
     usageCount: 12, 
     location: 'Surabaya', 
     isActive: true 

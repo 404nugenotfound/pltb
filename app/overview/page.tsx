@@ -7,6 +7,7 @@ import NLPResult from "@/app/components/upload/NLPResult";
 import EDASection from "@/app/components/overview/EdaSection";
 import { useEffect, useState } from "react";
 import { useMetrics } from "@/app/hooks/useMetrics";
+import type { ForecastData } from "@/app/components/overview/ForecastChart";
 
 const OverfitChart = dynamic(
   () => import("@/app/components/overview/OverfitChart"),
@@ -46,6 +47,7 @@ export default function OverviewPage() {
   const [generateMode, setGenerateMode] = useState<"general" | "best">("general");
   const [activeVar, setActiveVar]     = useState("WS10M");
   const [activeTab, setActiveTab]     = useState<AnalysisTab>("eda");
+  const [forecastData, setForecastData] = useState<ForecastData | null>(null);;
 
   const { dataset_name } = useMetrics();
 
@@ -54,18 +56,27 @@ export default function OverviewPage() {
     const savedReport = sessionStorage.getItem(`ventara_nlp_report_${username}`);
     const savedMode   = sessionStorage.getItem(`ventara_generate_mode_${username}`);
     const savedVar    = sessionStorage.getItem(`ventara_active_var_${username}`);
+    const savedForecast = sessionStorage.getItem(`ventara_forecast_data_${username}`);
+      if (savedForecast) {
+        try {
+          setForecastData(JSON.parse(savedForecast));
+        } catch {}
+      }
 
     if (savedReport) setNlpReport(savedReport);
     if (savedMode)   setGenerateMode(savedMode as "general" | "best");
     if (savedVar)    setActiveVar(savedVar);
 
-    fetch("http://localhost:5000/overview_data", { credentials: "include" })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.nlp_report)    setNlpReport(data.nlp_report);
-        if (data.generate_mode) setGenerateMode(data.generate_mode);
-      })
-      .catch(() => {});
+    // ✅ skip fetch backend kalau sessionStorage udah punya data
+    if (!savedReport && !savedMode) {
+      fetch("http://localhost:5000/overview_data", { credentials: "include" })
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.nlp_report)    setNlpReport(data.nlp_report);
+          if (data.generate_mode) setGenerateMode(data.generate_mode);
+        })
+        .catch(() => {});
+    }
   }, []);
 
   return (
@@ -82,6 +93,7 @@ export default function OverviewPage() {
               datasetName={dataset_name}
               generateMode={generateMode}
               nlpReport={nlpReport}
+              forecastData={forecastData}
             />
 
             {/* NLP Result tetap di luar card */}
@@ -138,12 +150,17 @@ export default function OverviewPage() {
                   <ForecastChart
                     mode={generateMode}
                     varParam={activeVar}
+                    initialData={forecastData}                      
+                    onDataLoaded={(d) => {
+                      setForecastData(d as ForecastData);
+                      const username = sessionStorage.getItem("ventara_username");
+                      sessionStorage.setItem(`ventara_forecast_data_${username}`, JSON.stringify(d));
+                    }}
                   />
                 )}
 
               </div>
             </div>
-
           </div>
         </div>
       </main>

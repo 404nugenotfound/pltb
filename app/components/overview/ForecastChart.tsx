@@ -27,9 +27,11 @@ interface Props {
   mode?: string;
   varParam?: string;
   onVarChange?: (v: string) => void;
+  initialData?: ForecastData | null;
+  onDataLoaded?: (data: object) => void;
 }
 
-interface ForecastData {
+export interface ForecastData {
   mode: string;
   var: string;
   labels: string[];
@@ -59,6 +61,8 @@ export default function ForecastChart({
   mode = "general",
   varParam = "WS10M",
   onVarChange,
+  initialData,    // ← tambah
+  onDataLoaded,   // ← tambah
 }: Props) {
   const [selectedModel, setSelectedModel] = useState("GBR");
   const [localVar, setLocalVar]           = useState(varParam);
@@ -71,28 +75,41 @@ export default function ForecastChart({
     setLocalVar(varParam);
   }, [varParam]);
 
+
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res  = await fetch(`/api/forecast-result?mode=${mode}&var=${localVar}`);
-        const json = await res.json();
-        if (json.error) {
-          setError(json.error);
-        } else {
-          setData(json);
-          const firstModel = Object.keys(json.predictions)[0];
-          if (firstModel) setSelectedModel(firstModel);
-        }
-      } catch {
-        setError("Gagal mengambil data dari server.");
-      } finally {
-        setLoading(false);
+  if (initialData) {
+    setData(initialData as ForecastData);
+    const firstModel = Object.keys(initialData.predictions)[0];
+    if (firstModel) setSelectedModel(firstModel);
+    setLoading(false);
+    return; // skip fetch
+  }
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`http://localhost:5000/forecast_result?mode=${mode}&var=${localVar}`, {
+        credentials: "include",
+      });
+      const json = await res.json();
+      if (json.error) {
+        setError(json.error);
+      } else {
+        setData(json);
+        onDataLoaded?.(json); // ← tambah
+        const firstModel = Object.keys(json.predictions)[0];
+        if (firstModel) setSelectedModel(firstModel);
       }
-    };
-    fetchData();
-  }, [mode, localVar]);
+    } catch {
+      setError("Gagal mengambil data dari server.");
+    } finally {
+      setLoading(false);
+    }
+  };
+  fetchData();
+}, [mode, localVar, initialData]);
+
 
   const handleVarChange = (v: string) => {
     setLocalVar(v);

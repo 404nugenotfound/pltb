@@ -30,12 +30,15 @@ export default function ForecastingPage() {
     const savedState  = sessionStorage.getItem(`ventara_ui_state_${username}`) as "idle" | "loading" | "nlp" | null;
     const savedReport = sessionStorage.getItem(`ventara_nlp_report_${username}`);
     const savedMode   = sessionStorage.getItem(`ventara_generate_mode_${username}`);
-    const savedEnsemble = sessionStorage.getItem(`ventara_ensemble_summary_${username}`);  // ← tambah
+    const savedEnsemble = sessionStorage.getItem(`ventara_ensemble_summary_${username}`);
 
     if (savedState)   setUiState(savedState);
     if (savedReport)  setNlpReport(savedReport);
-    if (savedMode)    setGenerateMode(savedMode as "general" | "best");
-    if (savedEnsemble) setEnsembleSummary(JSON.parse(savedEnsemble));  // ← tambah
+    if (savedMode) {
+      setGenerateMode(savedMode as "general" | "best");
+      setSelectedModel(savedMode);   // ← tambah ini
+    }
+    if (savedEnsemble) setEnsembleSummary(JSON.parse(savedEnsemble));
   }, []);
 
   return (

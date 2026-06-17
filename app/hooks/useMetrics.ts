@@ -47,7 +47,13 @@ export function useMetrics(selectedVar: string = "WS10M") {
   const fetchData = useCallback(async () => {
     try {
       const username = sessionStorage.getItem("ventara_username") || "";
-      const res = await fetch(`/api/forecasting-data?username=${username}&var=${selectedVar}`);
+      const res = await fetch(
+        `http://localhost:5000/forecasting_data?var=${selectedVar}`,
+        {
+          credentials: "include",
+          headers: { "X-Username": username },
+        }
+      );
       const json = await res.json();
       if (json.error || !json.metrics) return;
       setData(json);

@@ -5,6 +5,8 @@ export interface User {
   email: string;
   registeredAt: string;
   lastActive: string;
+  lastLogin: string;
+  lastLogout: string;
   usageCount: number;
   location: string;
   isActive: boolean;
@@ -13,8 +15,7 @@ export interface User {
 export interface ResourceLimit {
   id: string;
   featureName: string;
-  dailyLimit: number;
-  monthlyLimit: number;
+  maxStorageMb: number;
   description: string;
 }
 
@@ -36,9 +37,23 @@ export interface UsageLog {
 export interface DashboardStats {
   totalUsers: number;
   activeUsersToday: number;
+  totalUsersToday: number;
   totalUsageToday: number;
   topLocations: { location: string; count: number }[];
   recentActivities: UsageLog[];
+  activeUsers: User[];
+  weeklyUsage: { day: string; count: number }[];
+}
+
+export interface HistoryEntry {
+  id: number;
+  waktu: string;
+  file?: string;
+  algo?: string;
+  periode?: string;
+  hasil?: { label: string; value: string }[];
+  status?: string;
+  nlp_report?: string;
 }
 
 export type AdminTab = 'dashboard' | 'resource' | 'users';

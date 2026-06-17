@@ -39,6 +39,38 @@ def upload_dataset():
             )
 
     # =========================
+    # HANDLE SKIP SNAPSHOT (re-submit tanpa upload ulang)
+    # =========================
+    skip_snapshot = request.form.get("skip_snapshot", "false").lower() == "true"
+    reuse_filename = request.form.get("filename", "")
+
+    if skip_snapshot and reuse_filename and "dataset" not in request.files:
+        final_path = os.path.join(UPLOAD_FOLDER, secure_filename(reuse_filename))
+        if not os.path.exists(final_path):
+            return jsonify({"status": "error", "message": "File tidak ditemukan di server."}), 404
+
+        set_active_dataset_path_for_user(final_path)
+
+        with train_lock:
+            train_progress[username] = {
+                "running": True,
+                "step": "Memulai training...",
+                "done": False,
+                "error": None,
+                "log": [],
+                "cancel": False,
+                "skip_snapshot": True,
+            }
+
+        threading.Thread(
+            target=worker_retrain,
+            args=(username, final_path, train_progress, train_lock),
+            daemon=True,
+        ).start()
+
+        return jsonify({"status": "started", "filename": reuse_filename, "message": "Training dimulai tanpa snapshot"})
+
+    # =========================
     # VALIDASI FILE
     # =========================
     if "dataset" not in request.files:
@@ -96,29 +128,31 @@ def upload_dataset():
     set_active_dataset_path_for_user(final_path)
 
     # =========================
+    # HITUNG HASH
+    # =========================
+    file_hash = compute_file_hash(final_path)
+
+    # =========================
     # CHECK CACHE TRAIN
     # =========================
     from utils.cache_settings import get_cache_settings
 
     settings = get_cache_settings()
 
-    already_trained, file_hash = is_dataset_already_trained(final_path, username)
+    already_trained, _ = is_dataset_already_trained(final_path, username)
 
     if settings["model_cache"] and already_trained:
-        model_dir = get_model_dir_for_user(username)   # users/<username>/
-        snap_dir  = get_snap_dir_for_user(username)    # models/snap_<username>/
-        registry  = load_model_registry(username)
-        entry     = registry.get(file_hash, {})
 
-        # Restore dari snap ke model aktif (users/<username>/)
-        if os.path.exists(snap_dir):
-            os.makedirs(model_dir, exist_ok=True)
-            for fname in os.listdir(snap_dir):
-                shutil.copy2(
-                    os.path.join(snap_dir, fname),
-                    os.path.join(model_dir, fname)
-                )
+        # Cari snapshot yang matching hash ini
+        from utils.user_helpers import load_user
+        user = load_user(username)
+        snapshots = user.get("snapshots", []) if user else []
+        snap = next((s for s in snapshots if s.get("hash") == file_hash), None)
 
+        if snap:
+            # Restore model dari snapshot yang matching
+            restore_snapshot(username, snap["id"])
+        
         reload_all_globals(final_path, username=username)
 
         return jsonify(
@@ -126,9 +160,30 @@ def upload_dataset():
                 "status": "skipped",
                 "filename": filename,
                 "message": "Dataset sudah pernah di-train",
-                "trained_at": entry.get("trained_at", ""),
+                "trained_at": snap.get("trained_at", "") if snap else "",
             }
         )
+
+    # =========================
+    # CEK QUOTA SNAPSHOT
+    # =========================
+    skip_snapshot = request.form.get("skip_snapshot", "false").lower() == "true"
+
+    if not skip_snapshot:
+
+        quota = check_snapshot_quota(username, file_hash)
+
+        if not quota["allowed"]:
+
+            return jsonify(
+                {
+                    "status": "snapshot_full",
+                    "message": "Slot snapshot penuh. Kelola snapshot atau lanjut tanpa menyimpan.",
+                    "snapshot_count": quota["count"],
+                    "snapshot_limit": quota["limit"],
+                    "tier": quota["tier"],
+                }
+            ), 200
 
     # =========================
     # START TRAIN
@@ -141,6 +196,7 @@ def upload_dataset():
             "error": None,
             "log": [],
             "cancel": False,
+            "skip_snapshot": skip_snapshot,
         }
 
     threading.Thread(

@@ -11,6 +11,7 @@ interface SaveHistoryPayload {
     value: string;
   }[];
   nlp_report: string;
+  forecast_data?: object | null;
   onStorageFull?: () => void;  // ← callback
 }
 
@@ -22,6 +23,7 @@ export function useSaveHistory() {
     periode,
     hasil,
     nlp_report,
+    forecast_data,
     onStorageFull,
   }: SaveHistoryPayload) => {
 
@@ -35,6 +37,7 @@ export function useSaveHistory() {
         hasil,
         status: "Selesai",
         nlp_report,
+        forecast_data: forecast_data ?? null,
       };
 
       const username = sessionStorage.getItem("ventara_username");

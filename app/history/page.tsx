@@ -22,7 +22,8 @@ interface HistorisItem {
   periode: string;
   hasil: HasilItem[];
   status: StatusKey;
-  nlp_report?: string; // ← tambah
+  nlp_report?: string;
+  forecast_data?: object | null; // ← tambah
 }
 
 const ALGO_STYLE: Record<AlgoKey, string> = {
@@ -293,6 +294,10 @@ export default function HistorisPage() {
                                     row.algo.includes("LSTM")
                                     ? "best"
                                     : "general",
+                                );
+                                sessionStorage.setItem(
+                                  `ventara_forecast_data_${username}`,
+                                  JSON.stringify(row.forecast_data ?? null)
                                 );
                                 window.location.href = "/overview";
                               }}
