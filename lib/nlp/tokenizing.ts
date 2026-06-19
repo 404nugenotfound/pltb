@@ -57,10 +57,10 @@ function tokenizeTemperature(raw: WeatherRaw): WeatherToken[] {
   // Klasifikasi suhu ke label teks
   let tempLabel: string
   if (raw.tempC <= 10) tempLabel = "sangat_dingin"
-  else if (raw.tempC <= 18) tempLabel = "dingin"
-  else if (raw.tempC <= 24) tempLabel = "sejuk"
+  else if (raw.tempC <= 16) tempLabel = "dingin"
+  else if (raw.tempC <= 23) tempLabel = "sejuk"
   else if (raw.tempC <= 30) tempLabel = "hangat"
-  else if (raw.tempC <= 36) tempLabel = "panas"
+  else if (raw.tempC <= 35) tempLabel = "panas"
   else tempLabel = "sangat_panas"
 
   tokens.push({
@@ -139,10 +139,10 @@ function tokenizeWind(raw: WeatherRaw): WeatherToken[] {
   // Skala Beaufort sederhana
   let windLabel: string
   if (raw.windSpeedKPH < 2) windLabel = "tenang"
-  else if (raw.windSpeedKPH < 12) windLabel = "sepoi_sepoi"
-  else if (raw.windSpeedKPH < 29) windLabel = "angin_ringan"
-  else if (raw.windSpeedKPH < 50) windLabel = "angin_sedang"
-  else if (raw.windSpeedKPH < 75) windLabel = "angin_kencang"
+  else if (raw.windSpeedKPH < 15) windLabel = "sepoi_sepoi"
+  else if (raw.windSpeedKPH < 30) windLabel = "angin_ringan"
+  else if (raw.windSpeedKPH < 55) windLabel = "angin_sedang"
+  else if (raw.windSpeedKPH < 80) windLabel = "angin_kencang"
   else windLabel = "badai"
 
   tokens.push({

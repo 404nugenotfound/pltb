@@ -36,15 +36,14 @@ def get_snap_dir_for_user(username: str) -> str:
 # SNAPSHOT LIMITS PER TIER
 # =========================
 SNAPSHOT_LIMITS = {
-    "gratis":   2,
+    "free":   2,
     "basic":    3,
-    "pro":      10,
     "business": -1,  # unlimited
 }
 
 def get_snapshot_limit(tier: str) -> int:
     """Return max snapshot slots. -1 = unlimited."""
-    return SNAPSHOT_LIMITS.get(tier, SNAPSHOT_LIMITS["gratis"])
+    return SNAPSHOT_LIMITS.get(tier, SNAPSHOT_LIMITS["free"])
 
 
 # =========================
@@ -59,26 +58,13 @@ def get_snapshot_dir(username: str, snapshot_id: str) -> str:
 # CEK QUOTA SNAPSHOT
 # =========================
 def check_snapshot_quota(username: str, file_hash: str) -> dict:
-    """
-    Cek apakah masih ada slot snapshot.
-    Kalau hash sudah ada di snapshots → dianggap overwrite, selalu allowed.
-
-    Return:
-        {
-            "allowed": bool,
-            "is_overwrite": bool,   # True = hash sama, tinggal overwrite
-            "count": int,
-            "limit": int,
-            "tier": str
-        }
-    """
     from utils.user_helpers import load_user
 
     user = load_user(username)
     if not user:
-        return {"allowed": False, "is_overwrite": False, "count": 0, "limit": 0, "tier": "gratis"}
+        return {"allowed": False, "is_overwrite": False, "count": 0, "limit": 0, "tier": "free"}
 
-    tier     = user.get("storage_tier", "gratis")
+    tier     = user.get("storage_tier", "free")
     limit    = get_snapshot_limit(tier)
     snapshots = user.get("snapshots", [])
     count    = len(snapshots)
@@ -94,14 +80,16 @@ def check_snapshot_quota(username: str, file_hash: str) -> dict:
 
 
 # =========================
-# SAVE SNAPSHOT — ke user JSON + copy model
+# SAVE SNAPSHOT — ke user JSON + copy model + registry.json lokal
 # =========================
 def save_snapshot(username: str, file_hash: str, dataset_path: str, metrics: dict, existing_id: str = None) -> str:
     """
-    Bikin/update snapshot entry di user.json + copy model aktif ke folder snapshot.
+    Bikin/update snapshot entry di user.json + copy model aktif ke folder snapshot
+    + tulis registry.json lokal di folder snapshot (sumber kebenaran independen).
     Return snapshot_id.
     """
     from utils.user_helpers import load_user, save_user
+    import shutil
 
     user = load_user(username)
     if not user:
@@ -109,7 +97,6 @@ def save_snapshot(username: str, file_hash: str, dataset_path: str, metrics: dic
 
     model_dir = get_model_dir_for_user(username)
 
-    # Pakai existing_id kalau overwrite, bikin baru kalau slot baru
     snapshot_id = existing_id or f"snap_{file_hash[:8]}_{int(datetime.now().timestamp())}"
     snap_dir    = get_snapshot_dir(username, snapshot_id)
 
@@ -119,10 +106,21 @@ def save_snapshot(username: str, file_hash: str, dataset_path: str, metrics: dic
     for fname in os.listdir(model_dir):
         src = os.path.join(model_dir, fname)
         if os.path.isfile(src):
-            import shutil
             shutil.copy2(src, os.path.join(snap_dir, fname))
 
-    # Update atau insert entry di snapshots[]
+    # ✅ Tulis registry.json LOKAL — sumber kebenaran independen per snapshot
+    registry_entry = {
+        "id":         snapshot_id,
+        "dataset":    os.path.basename(dataset_path),
+        "hash":       file_hash,
+        "trained_at": datetime.now().isoformat(),
+        "metrics":    metrics,
+    }
+    registry_path = os.path.join(snap_dir, "registry.json")
+    with open(registry_path, "w") as f:
+        json.dump(registry_entry, f, indent=2)
+
+    # Update atau insert entry di snapshots[] (tetap dipertahankan utk listing cepat di UI)
     entry = {
         "id":         snapshot_id,
         "dataset":    os.path.basename(dataset_path),
@@ -135,10 +133,8 @@ def save_snapshot(username: str, file_hash: str, dataset_path: str, metrics: dic
     snapshots = user.get("snapshots", [])
 
     if existing_id:
-        # Overwrite entry lama
         snapshots = [entry if s["id"] == existing_id else s for s in snapshots]
     else:
-        # Insert di depan
         snapshots.insert(0, entry)
 
     user["snapshots"] = snapshots
@@ -146,40 +142,50 @@ def save_snapshot(username: str, file_hash: str, dataset_path: str, metrics: dic
 
     return snapshot_id
 
+# =========================
+# LOAD REGISTRY LOKAL — sumber kebenaran dari folder snapshot
+# =========================
+def load_snapshot_registry(username: str, snapshot_id: str) -> dict:
+    """Baca registry.json langsung dari folder snapshot — independen dari user.json"""
+    snap_dir = get_snapshot_dir(username, snapshot_id)
+    registry_path = os.path.join(snap_dir, "registry.json")
+
+    if not os.path.exists(registry_path):
+        return {}
+
+    with open(registry_path, "r") as f:
+        return json.load(f)
 
 # =========================
-# RESTORE SNAPSHOT — copy model snapshot ke model aktif
+# RESTORE SNAPSHOT — copy model + baca registry.json lokal
 # =========================
-def restore_snapshot(username: str, snapshot_id: str) -> bool:
+def restore_snapshot(username: str, snapshot_id: str) -> dict:
     """
     Copy model dari snapshot ke users/<username>/ (model aktif).
-    Return True kalau berhasil.
+    Return dict registry (dataset, metrics, trained_at) dari registry.json LOKAL,
+    atau {} kalau gagal.
     """
     import shutil
-    from utils.user_helpers import load_user
 
-    user = load_user(username)
-    if not user:
-        return False
-
-    snapshots = user.get("snapshots", [])
-    snap = next((s for s in snapshots if s["id"] == snapshot_id), None)
-    if not snap:
-        return False
-
-    snap_dir  = snap["model_dir"]
+    snap_dir  = get_snapshot_dir(username, snapshot_id)
     model_dir = get_model_dir_for_user(username)
 
     if not os.path.exists(snap_dir):
-        return False
+        return {}
+
+    registry = load_snapshot_registry(username, snapshot_id)
+    if not registry:
+        return {}
 
     os.makedirs(model_dir, exist_ok=True)
     for fname in os.listdir(snap_dir):
+        if fname == "registry.json":
+            continue
         src = os.path.join(snap_dir, fname)
         if os.path.isfile(src):
             shutil.copy2(src, os.path.join(model_dir, fname))
 
-    return True
+    return registry
 
 
 # =========================

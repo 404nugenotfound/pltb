@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import Sidebar from "@/app/components/layout/Sidebar";
 import Header from "@/app/components/layout/Header";
 import { useStorage } from "@/app/context/StorageContext";
+import PaymentModal from "@/app/components/payments/PaymentModal";
+import UpgradeModal from "@/app/components/payments/UpgradeModal";
 
-type AlgoKey = "BI-LSTM" | "XGB-LSTM" | "LSTM" | "XGBoost";
+type AlgoKey = "Best Model" | "General Model";
 type StatusKey = "Selesai" | "Error" | "Berjalan";
 
 interface HasilItem {
@@ -13,24 +15,20 @@ interface HasilItem {
   value: string;
 }
 
-// Tambah nlp_report di interface
 interface HistorisItem {
   id: number;
   waktu: string;
   file: string;
-  algo: string; // ← ganti dari AlgoKey biar fleksibel
+  algo: string;
   periode: string;
-  hasil: HasilItem[];
   status: StatusKey;
   nlp_report?: string;
-  forecast_data?: object | null; // ← tambah
+  forecast_data?: object | null;
 }
 
 const ALGO_STYLE: Record<AlgoKey, string> = {
-  "BI-LSTM": "bg-blue-50 text-blue-700",
-  "XGB-LSTM": "bg-purple-50 text-purple-700",
-  LSTM: "bg-teal-50 text-teal-700",
-  XGBoost: "bg-amber-50 text-amber-700",
+  "Best Model": "bg-amber-50 text-amber-600 border border-amber-200",
+  "General Model": "bg-blue-50 text-blue-700",
 };
 
 const STATUS_STYLE: Record<StatusKey, string> = {
@@ -47,15 +45,14 @@ const STATUS_DOT: Record<StatusKey, string> = {
 
 export default function HistorisPage() {
   const [search, setSearch] = useState("");
-  const [data, setData] = useState<HistorisItem[]>([]); // ← tambah
-  const [detailItem, setDetailItem] = useState<HistorisItem | null>(null); // ← tambah
+  const [data, setData] = useState<HistorisItem[]>([]);
+  const [detailItem, setDetailItem] = useState<HistorisItem | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
 
-  const {storageInfo, refreshStorage } = useStorage();
+  const { storageInfo, refreshStorage } = useStorage();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [selectedTier, setSelectedTier] =
-  useState<"basic" | "business">("basic");
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
 
   useEffect(() => {
     async function init() {
@@ -72,12 +69,31 @@ export default function HistorisPage() {
       }
     }
 
+    async function fetchPaymentHistory() {
+      const username = sessionStorage.getItem("ventara_username") || "";
+      if (!username) return;
+      try {
+        const res = await fetch(`/api/payment/history?username=${username}`);
+        const json = await res.json();
+        if (json.success) setPaymentHistory(json.data);
+      } catch {}
+    }
+
     init();
+    fetchPaymentHistory();
   }, []);
 
-  // ganti DUMMY_DATA jadi data
+  async function refreshPaymentHistory() {
+    const username = sessionStorage.getItem("ventara_username") || "";
+    try {
+      const res = await fetch(`/api/payment/history?username=${username}`);
+      const json = await res.json();
+      if (json.success) setPaymentHistory(json.data);
+    } catch {}
+  }
 
   console.log("DATA STATE =", data);
+
   const filtered = data.filter((d) => {
     const q = search.toLowerCase();
     return (
@@ -183,7 +199,7 @@ export default function HistorisPage() {
                 onClick={() => setShowUpgradeModal(true)}
                 className="text-sm text-teal-600 font-medium hover:text-teal-700 whitespace-nowrap border border-teal-200 px-4 py-2 rounded-xl hover:bg-teal-50 cursor-pointer transition"
               >
-                Upgrade (Gratis)
+                Upgrade (Free)
               </button>
             </div>
 
@@ -192,36 +208,18 @@ export default function HistorisPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-left px-4 py-3.5 text-xs font-medium text-gray-500 w-[18%]">
-                      Waktu
-                    </th>
-                    <th className="text-left px-4 py-3.5 text-xs font-medium text-gray-500 w-[22%]">
-                      File Data
-                    </th>
-                    <th className="text-left px-4 py-3.5 text-xs font-medium text-gray-500 w-[12%]">
-                      Algoritma
-                    </th>
-                    <th className="text-left px-4 py-3.5 text-xs font-medium text-gray-500 w-[10%]">
-                      Periode
-                    </th>
-                    <th className="text-left px-4 py-3.5 text-xs font-medium text-gray-500 w-[23%]">
-                      Hasil Prediksi
-                    </th>
-                    <th className="text-left px-4 py-3.5 text-xs font-medium text-gray-500 w-[9%]">
-                      Status
-                    </th>
-                    <th className="text-center px-4 py-3.5 text-xs font-medium text-gray-500 w-[6%]">
-                      Aksi
-                    </th>
+                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[20%]">Waktu</th>
+                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[28%]">File Data</th>
+                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[15%]">Algoritma</th>
+                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[12%]">Periode</th>
+                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[12%]">Status</th>
+                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[13%]">Aksi</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td
-                        colSpan={7}
-                        className="text-center py-12 text-gray-400 text-sm"
-                      >
+                      <td colSpan={6} className="text-center py-12 text-gray-400 text-sm">
                         Tidak ada data yang cocok
                       </td>
                     </tr>
@@ -231,46 +229,17 @@ export default function HistorisPage() {
                         key={row.id}
                         className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
                       >
-                        <td className="px-4 py-4 text-xs text-gray-500">
-                          {row.waktu}
-                        </td>
-                        <td className="px-4 py-4 text-sm text-gray-700">
-                          {row.file}
-                        </td>
-                        <td className="px-4 py-4">
-                          <span
-                            className={`... ${ALGO_STYLE[row.algo as AlgoKey] ?? "bg-gray-50 text-gray-700"}`}
-                          >
+                        <td className="px-4 py-4 text-xs text-gray-500 text-center">{row.waktu}</td>
+                        <td className="px-4 py-4 text-sm text-gray-700 text-center">{row.file}</td>
+                        <td className="px-4 py-4 text-center">
+                          <span className={`inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full ${ALGO_STYLE[row.algo as AlgoKey] ?? "bg-gray-50 text-gray-700"}`}>
                             {row.algo}
                           </span>
                         </td>
-                        <td className="px-4 py-4 text-sm text-gray-600">
-                          {row.periode}
-                        </td>
-                        <td className="px-4 py-4">
-                          <div className="flex flex-col gap-0.5">
-                            {(row.hasil ?? []).map((h, i) => (
-                              <div
-                                key={i}
-                                className="flex items-center gap-2 text-xs"
-                              >
-                                <span className="text-gray-400 w-16">
-                                  {h.label}
-                                </span>
-                                <span className="font-semibold text-gray-700">
-                                  {h.value}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </td>
-                        <td className="px-4 py-4">
-                          <span
-                            className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_STYLE[row.status]}`}
-                          >
-                            <span
-                              className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[row.status]}`}
-                            />
+                        <td className="px-4 py-4 text-sm text-gray-600 text-center">{row.periode}</td>
+                        <td className="px-4 py-4 text-center">
+                          <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_STYLE[row.status]}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[row.status]}`} />
                             {row.status}
                           </span>
                         </td>
@@ -278,68 +247,33 @@ export default function HistorisPage() {
                           <div className="flex items-center justify-center gap-2">
                             <button
                               onClick={() => {
-                                const username =
-                                  sessionStorage.getItem("ventara_username");
-                                sessionStorage.setItem(
-                                  `ventara_ui_state_${username}`,
-                                  "nlp",
-                                );
-                                sessionStorage.setItem(
-                                  `ventara_nlp_report_${username}`,
-                                  row.nlp_report || "",
-                                );
+                                const username = sessionStorage.getItem("ventara_username");
+                                sessionStorage.setItem(`ventara_ui_state_${username}`, "nlp");
+                                sessionStorage.setItem(`ventara_nlp_report_${username}`, row.nlp_report || "");
                                 sessionStorage.setItem(
                                   `ventara_generate_mode_${username}`,
-                                  row.algo.includes("BiLSTM") ||
-                                    row.algo.includes("LSTM")
-                                    ? "best"
-                                    : "general",
+                                  row.algo === "Best Model" ? "best" : "general",
                                 );
                                 sessionStorage.setItem(
                                   `ventara_forecast_data_${username}`,
-                                  JSON.stringify(row.forecast_data ?? null)
+                                  JSON.stringify(row.forecast_data ?? null),
                                 );
                                 window.location.href = "/overview";
                               }}
                               className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-colors cursor-pointer"
                               title="Lihat detail"
                             >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                                />
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
-                                />
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                               </svg>
                             </button>
                             <button
                               className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-teal-600 hover:bg-teal-50 hover:border-teal-200 transition-colors cursor-pointer"
                               title="Unduh CSV"
                             >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                                />
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                               </svg>
                             </button>
                             <button
@@ -347,18 +281,8 @@ export default function HistorisPage() {
                               className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors cursor-pointer"
                               title="Hapus"
                             >
-                              <svg
-                                className="w-4 h-4"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                                />
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                               </svg>
                             </button>
                           </div>
@@ -371,21 +295,16 @@ export default function HistorisPage() {
             </div>
           </div>
         </div>
+
+        {/* Modal Detail */}
         {detailItem && (
           <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-6">
             <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-gray-900">Detail Prediksi</h3>
-                <button
-                  onClick={() => setDetailItem(null)}
-                  className="text-gray-400 hover:text-gray-600 text-lg"
-                >
-                  ✕
-                </button>
+                <button onClick={() => setDetailItem(null)} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
               </div>
-              <p className="text-xs text-gray-500 mb-1">
-                {detailItem.waktu} • {detailItem.file}
-              </p>
+              <p className="text-xs text-gray-500 mb-1">{detailItem.waktu} • {detailItem.file}</p>
               <div className="mt-3 p-4 bg-teal-50 rounded-xl border border-teal-100">
                 <p className="text-sm text-gray-700 leading-relaxed">
                   {detailItem.nlp_report || "Tidak ada laporan AI tersedia."}
@@ -394,36 +313,23 @@ export default function HistorisPage() {
             </div>
           </div>
         )}
+
         {/* Popup Delete History */}
         {deleteConfirmId && (
           <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-6">
             <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center shrink-0">
-                  <svg
-                    className="w-5 h-5 text-red-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
+                  <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">Hapus Riwayat</h3>
-                  <p className="text-sm text-gray-500 mt-0.5">
-                    Tindakan ini tidak dapat dibatalkan.
-                  </p>
+                  <p className="text-sm text-gray-500 mt-0.5">Tindakan ini tidak dapat dibatalkan.</p>
                 </div>
               </div>
-              <p className="text-sm text-gray-600 mb-6">
-                Apakah Anda yakin ingin menghapus riwayat ini?
-              </p>
+              <p className="text-sm text-gray-600 mb-6">Apakah Anda yakin ingin menghapus riwayat ini?</p>
               <div className="flex gap-3 justify-end">
                 <button
                   onClick={() => setDeleteConfirmId(null)}
@@ -432,115 +338,28 @@ export default function HistorisPage() {
                   Batal
                 </button>
                 <button
-                  onClick={() => {
-                    handleDelete(deleteConfirmId);
-                    setDeleteConfirmId(null);
-                  }}
+                  onClick={() => { handleDelete(deleteConfirmId); setDeleteConfirmId(null); }}
                   disabled={deletingId === deleteConfirmId}
                   className="px-4 py-2 text-sm rounded-lg bg-red-500 text-white hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
                 >
-                  {deletingId === deleteConfirmId
-                    ? "Menghapus..."
-                    : "Hapus"}
+                  {deletingId === deleteConfirmId ? "Menghapus..." : "Hapus"}
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Modal Upgrade */}
+        {/* Upgrade Modal */}
         {showUpgradeModal && (
-          <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-6">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-semibold text-gray-900 text-lg">
-                  Upgrade Penyimpanan
-                </h3>
-                <button
-                  onClick={() => setShowUpgradeModal(false)}
-                  className="text-gray-400 hover:text-gray-600 cursor-pointer"
-                >
-                  ✕
-                </button>
-              </div>
-              <p className="text-sm text-gray-500 mb-5">
-                Paket saat ini:{" "}
-                <span className="text-teal-600 font-semibold capitalize">
-                  {storageInfo.tier} ({storageInfo.limit_mb} MB)
-                </span>
-              </p>
-
-              <div className="grid grid-cols-2 gap-3 mb-5">
-                {[
-                  {
-                    key: "basic",
-                    label: "Basic",
-                    mb: "100.00 MB",
-                    price: "Rp 199.000 / bulan",
-                  },
-                  {
-                    key: "business",
-                    label: "Business",
-                    mb: "2048.00 MB",
-                    price: "Rp 599.000 / bulan",
-                  },
-                ].map((tier) => (
-                  <div
-                    key={tier.key}
-                    onClick={() => setSelectedTier(tier.key as "basic" | "business")}
-                    className={`cursor-pointer border-2 rounded-xl p-4 transition ${
-                      selectedTier === tier.key
-                        ? "border-teal-400 bg-teal-50"
-                        : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <div className="flex justify-between items-center mb-1">
-                      <span className="font-semibold text-gray-800">
-                        {tier.label}
-                      </span>
-                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
-                        Bayar
-                      </span>
-                    </div>
-                    <p className="text-xl font-bold text-gray-900">{tier.mb}</p>
-                    <p className="text-sm text-gray-500 mt-0.5">{tier.price}</p>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                onClick={async () => {
-                  const username =
-                    sessionStorage.getItem("ventara_username") || "";
-                  await fetch("http://localhost:5000/upgrade_tier", {
-                    method: "POST",
-                    headers: {
-                      "Content-Type": "application/json",
-                      "X-Username": username,
-                    },
-                    credentials: "include",
-                    body: JSON.stringify({
-                      tier: selectedTier,
-                    }),
-                  });
-
-                  await refreshStorage();
-
-                  setShowUpgradeModal(false);
-                }}
-                className="w-full py-3 bg-teal-600 text-white font-medium rounded-xl hover:bg-teal-700 transition capitalize cursor-pointer"
-              >
-                Upgrade ke {selectedTier} —{" "}
-                {
-                  {
-                    basic: "Rp 199.000",
-                    business: "Rp 599.000",
-                  }[selectedTier]
-                }
-                /bulan
-              </button>
-            </div>
-          </div>
+          <UpgradeModal
+            storageInfo={storageInfo}
+            paymentHistory={paymentHistory}
+            onClose={() => setShowUpgradeModal(false)}
+            onSuccess={async () => {
+              await refreshStorage();
+              await refreshPaymentHistory();
+            }}
+          />
         )}
       </main>
     </div>

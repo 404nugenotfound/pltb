@@ -17,7 +17,7 @@ export default function Header() {
           <img src="/icon/icon-angin.svg" className="w-6 h-6" alt="" />
         </div>
 
-        <div className="ml-3">
+        <div className="ml-3 cursor-default">
           <h1 className="text-xl font-bold text-teal-700">
             Sistem Peramalan Energi Angin
           </h1>

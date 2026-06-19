@@ -1,0 +1,11 @@
+[
+  {
+    "transaction_id": "60e0893a-723e-421a-9f51-829e88cc8794",
+    "tier": "basic",
+    "amount": 2000,
+    "payment_type": "qris",
+    "status": "settled",
+    "reference": "ventara-basic-kangkungkang",
+    "paid_at": "2026-06-18T11:18:28.607Z"
+  }
+]

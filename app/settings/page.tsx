@@ -19,20 +19,19 @@ interface Snapshot {
 export default function SettingsPage() {
   const router = useRouter();
   const { storageInfo } = useStorage();
+  console.log("storageInfo.tier =", storageInfo.tier);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [avatar, setAvatar] = useState(DEFAULT_AVATAR);
-  const [avatarError, setAvatarError] = useState(false);
 
-  const [cacheSize] = useState("128 MB");
-  const [modelCache, setModelCache] = useState(true);
-  const [metricsCache, setMetricsCache] = useState(true);
   const [clearingCache, setClearingCache] = useState(false);
   const [cacheCleared, setCacheCleared] = useState(false);
+  const [cacheEnabled, setCacheEnabled] = useState(true);
 
   // ── SNAPSHOT STATE ──
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
+  const [snapshotLimit, setSnapshotLimit] = useState(0);
   const [snapshotLoading, setSnapshotLoading] = useState(true);
   const [snapshotError, setSnapshotError] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -50,8 +49,7 @@ export default function SettingsPage() {
       try {
         const res = await fetch("/api/cache-settings");
         const data = await res.json();
-        setModelCache(data.model_cache);
-        setMetricsCache(data.metrics_cache);
+        setCacheEnabled(data.model_cache || data.metrics_cache);
       } catch (err) {
         console.error("Failed load cache settings", err);
       }
@@ -75,7 +73,8 @@ export default function SettingsPage() {
       if (!res.ok) throw new Error("Gagal memuat snapshot");
       const data = await res.json();
       setSnapshots(data.snapshots ?? []);
-    } catch (err) {
+      setSnapshotLimit(data.limit ?? 0);
+    } catch {
       setSnapshotError("Tidak dapat memuat daftar snapshot.");
     } finally {
       setSnapshotLoading(false);
@@ -108,28 +107,14 @@ export default function SettingsPage() {
       });
       if (!res.ok) throw new Error();
       setRestoreSuccess(dataset);
-      setTimeout(() => setRestoreSuccess(null), 3000);
+      setTimeout(() => {
+        router.push("/forecasting");
+        router.refresh();
+      }, 1500);
     } catch {
       setSnapshotError("Gagal restore snapshot. Coba lagi.");
     } finally {
       setRestoringId(null);
-    }
-  }
-
-  async function updateCacheSetting(
-    key: "model_cache" | "metrics_cache",
-    value: boolean
-  ) {
-    try {
-      const res = await fetch("/api/cache-settings", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ [key]: value }),
-      });
-      const data = await res.json();
-      console.log("saved", data);
-    } catch (err) {
-      console.error(err);
     }
   }
 
@@ -141,7 +126,10 @@ export default function SettingsPage() {
     setTimeout(() => setCacheCleared(false), 3000);
   }
 
-  const displayAvatar = avatarError || !avatar ? DEFAULT_AVATAR : avatar;
+  // Hitung persen + status penuh untuk slot usage bar snapshot
+  const snapshotPercent =
+    snapshotLimit > 0 ? Math.min((snapshots.length / snapshotLimit) * 100, 100) : 0;
+  const snapshotIsFull = snapshots.length >= snapshotLimit && snapshotLimit > 0;
 
   return (
     <div className="flex h-screen">
@@ -152,16 +140,16 @@ export default function SettingsPage() {
 
         <div className="p-8">
           <div className="max-w-5xl mx-auto">
-            <h2 className="text-2xl font-bold text-gray-900 mb-8">Settings</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-8 cursor-default">Settings</h2>
 
             {/* ── EDIT PROFILE ── */}
             <section className="mb-10 px-6">
-              <h3 className="text-base font-bold text-gray-800 mb-5">
+              <h3 className="text-base font-bold text-gray-800 mb-5 cursor-default">
                 Edit Profile
               </h3>
               <div className="space-y-0 divide-y divide-gray-100 border-t border-gray-100">
                 <div className="flex items-center justify-between py-4 px-6">
-                  <div>
+                  <div className="cursor-default">
                     <p className="text-sm text-gray-700">Manage Profile</p>
                     <p className="text-xs text-gray-400 mt-0.5">
                       Tampilan foto profil, email, username, dan password
@@ -183,75 +171,55 @@ export default function SettingsPage() {
 
             {/* ── MANAGE CACHE ── */}
             <section className="mb-10 px-6">
-              <h3 className="text-base font-bold text-gray-800 mb-5">
+              <h3 className="text-base font-bold text-gray-800 mb-5 cursor-default">
                 Manage Cache
               </h3>
               <div className="space-y-0 divide-y divide-gray-100 border-t border-gray-100">
-                {/* Cache size */}
+                
+                {/* Cache toggle — 1 toggle untuk model + metrics */}
                 <div className="flex items-center justify-between py-4 px-6">
-                  <div>
-                    <p className="text-sm text-gray-700">Cache Tersimpan</p>
+                  <div className="cursor-default">
+                    <p className="text-sm text-gray-700">Cache Model & Metrics</p>
                     <p className="text-xs text-gray-400 mt-0.5">
-                      Total cache model dan metrics yang telah tersimpan
-                    </p>
-                  </div>
-                  <span className="text-sm font-medium text-gray-600 bg-gray-100 px-3 py-1 rounded-lg">
-                    {cacheCleared ? "0 MB" : `${storageInfo.usage_mb.toFixed(2)} MB`}
-                  </span>
-                </div>
-
-                {/* Model cache toggle */}
-                <div className="flex items-center justify-between py-4 px-6">
-                  <div>
-                    <p className="text-sm text-gray-700">Cache Model</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Simpan model terlatih agar tidak perlu retrain ulang
+                      Simpan model terlatih dan hasil metrics agar tidak perlu retrain ulang
                     </p>
                   </div>
                   <button
                     onClick={async () => {
-                      const newValue = !modelCache;
-                      setModelCache(newValue);
-                      await updateCacheSetting("model_cache", newValue);
+                      const newValue = !cacheEnabled;
+                      setCacheEnabled(newValue);
+                      await fetch("/api/cache-settings", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          model_cache: newValue,
+                          metrics_cache: newValue,
+                        }),
+                      });
                     }}
-                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 cursor-pointer ${modelCache ? "bg-teal-500" : "bg-gray-300"}`}
+                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 cursor-pointer ${
+                      cacheEnabled ? "bg-teal-500" : "bg-gray-300"
+                    }`}
                   >
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${modelCache ? "translate-x-5" : "translate-x-0"}`} />
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${
+                      cacheEnabled ? "translate-x-5" : "translate-x-0"
+                    }`} />
                   </button>
                 </div>
 
-                {/* Metrics cache toggle */}
-                <div className="flex items-center justify-between py-4 px-6">
-                  <div>
-                    <p className="text-sm text-gray-700">Cache Metrics</p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Simpan hasil perhitungan MAE, RMSE, MAPE agar lebih cepat
-                    </p>
-                  </div>
-                  <button
-                    onClick={async () => {
-                      const newValue = !metricsCache;
-                      setMetricsCache(newValue);
-                      await updateCacheSetting("metrics_cache", newValue);
-                    }}
-                    className={`relative w-11 h-6 rounded-full transition-colors duration-200 cursor-pointer ${metricsCache ? "bg-teal-500" : "bg-gray-300"}`}
-                  >
-                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 ${metricsCache ? "translate-x-5" : "translate-x-0"}`} />
-                  </button>
-                </div>
               </div>
             </section>
 
             {/* ── KELOLA SNAPSHOT ── */}
             <section className="px-6">
               <div className="flex items-center justify-between mb-5">
-                <h3 className="text-base font-bold text-gray-800">
+                <h3 className="text-base font-bold text-gray-800 cursor-default">
                   Kelola Snapshot
                 </h3>
                 <button
                   onClick={loadSnapshots}
                   disabled={snapshotLoading}
-                  className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-teal-600 transition-colors"
+                  className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-teal-700 transition-colors cursor-pointer"
                 >
                   <svg
                     className={`w-3.5 h-3.5 ${snapshotLoading ? "animate-spin" : ""}`}
@@ -264,7 +232,43 @@ export default function SettingsPage() {
                 </button>
               </div>
 
-              {/* Restore success toast inline */}
+              {/* Slot usage bar — inline, tanpa component terpisah */}
+              {!snapshotLoading && snapshotLimit > 0 && (
+                <div className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-100 cursor-default">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                      Penggunaan Snapshot
+                    </span>
+                    <span className="text-xs capitalize font-bold text-teal-700 bg-teal-50 px-4 py-0.5 rounded-full border border-teal-200 tracking-wider">
+                      {
+                        storageInfo.tier === "gratis"
+                          ? "free"
+                          : storageInfo.tier
+                      }
+                    </span>
+                  </div>
+
+                  <div className="flex items-end gap-2 mb-2">
+                    <span className="text-2xl font-bold text-gray-900">{snapshots.length}</span>
+                    <span className="text-sm text-gray-400 mb-0.5">/ {snapshotLimit} slot</span>
+                  </div>
+
+                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${snapshotIsFull ? "bg-red-400" : "bg-teal-500"}`}
+                      style={{ width: `${snapshotPercent}%` }}
+                    />
+                  </div>
+
+                  <p className="text-xs text-gray-400 mt-2">
+                    {snapshotIsFull
+                      ? "Semua slot terpakai. Hapus snapshot lama untuk menyimpan yang baru."
+                      : `Sisa ${snapshotLimit - snapshots.length} slot tersedia.`}
+                  </p>
+                </div>
+              )}
+
+              {/* Restore success */}
               {restoreSuccess && (
                 <div className="mb-4 flex items-center gap-2 text-sm text-teal-700 bg-teal-50 border border-teal-200 rounded-lg px-4 py-2.5">
                   <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -285,7 +289,8 @@ export default function SettingsPage() {
               )}
 
               <div className="divide-y divide-gray-100 border-t border-gray-100">
-                {/* Loading skeleton */}
+
+                {/* Loading */}
                 {snapshotLoading && (
                   <div className="py-8 flex flex-col items-center gap-2">
                     <svg className="w-5 h-5 text-teal-400 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -298,7 +303,7 @@ export default function SettingsPage() {
 
                 {/* Empty state */}
                 {!snapshotLoading && snapshots.length === 0 && !snapshotError && (
-                  <div className="py-10 flex flex-col items-center gap-2 text-center">
+                  <div className="py-10 flex flex-col items-center gap-2 text-center cursor-default">
                     <svg className="w-8 h-8 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                       <path strokeLinecap="round" strokeLinejoin="round"
                         d="M20 7H4a2 2 0 00-2 2v6a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z" />
@@ -312,8 +317,7 @@ export default function SettingsPage() {
                 {/* Snapshot rows */}
                 {!snapshotLoading && snapshots.map((snap) => (
                   <div key={snap.id} className="flex items-center justify-between py-4 px-6">
-                    <div className="flex items-center gap-3 min-w-0">
-                      {/* Icon */}
+                    <div className="flex items-center gap-3 min-w-0 cursor-default">
                       <div className="w-8 h-8 rounded-lg bg-teal-50 border border-teal-100 flex items-center justify-center shrink-0">
                         <svg className="w-4 h-4 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
                           <path strokeLinecap="round" strokeLinejoin="round"
@@ -322,20 +326,18 @@ export default function SettingsPage() {
                           <circle cx="12" cy="13" r="1" fill="currentColor" />
                         </svg>
                       </div>
-                      {/* Info */}
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-gray-700 truncate">{snap.dataset}</p>
                         <p className="text-xs text-gray-400 mt-0.5">{snap.trained_at}</p>
                       </div>
                     </div>
 
-                    {/* Actions */}
                     <div className="flex items-center gap-2 shrink-0 ml-4">
                       {/* Restore */}
                       <button
                         onClick={() => handleRestoreSnapshot(snap.id, snap.dataset)}
                         disabled={restoringId === snap.id || deletingId === snap.id}
-                        className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-teal-200 text-teal-600 hover:bg-teal-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-teal-200 text-teal-600 hover:bg-teal-50 transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                       >
                         {restoringId === snap.id ? (
                           <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
@@ -355,7 +357,7 @@ export default function SettingsPage() {
                       <button
                         onClick={() => handleDeleteSnapshot(snap.id)}
                         disabled={deletingId === snap.id || restoringId === snap.id}
-                        className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50 cursor-pointer disabled:cursor-not-allowed"
                       >
                         {deletingId === snap.id ? (
                           <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">

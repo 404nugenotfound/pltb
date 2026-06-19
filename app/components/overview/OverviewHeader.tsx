@@ -43,9 +43,8 @@ export default function OverviewHeader({
             onClick={() =>
               saveHistory({
                 file: datasetName,
-                algo: generateMode === "best" ? "XGB-LSTM" : "General Model",
-                periode: "1 Jam",
-                hasil: [{ label: "BiLSTM:", value: "14.30 MW" }],
+                algo: generateMode === "best" ? "Best" : "General Model",
+                periode: "168 Jam",
                 nlp_report: nlpReport,
                 forecast_data: forecastData ?? null,
                 onStorageFull: () => setShowUpgradeModal(true),

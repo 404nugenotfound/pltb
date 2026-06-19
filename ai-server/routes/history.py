@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 import os, json
 from config import UPLOAD_FOLDER
+from utils.registry import get_model_dir_for_user, get_snapshot_limit
 
 history_bp = Blueprint("history_bp", __name__)
 
@@ -8,9 +9,8 @@ history_bp = Blueprint("history_bp", __name__)
 # TIER LIMITS
 # =========================
 TIER_LIMITS = {
-    "gratis":    10 * 1024 * 1024,   # 10 MB
+    "free":    10 * 1024 * 1024,   # 10 MB
     "basic":    100 * 1024 * 1024,   # 100 MB
-    "pro":      1 * 1024 * 1024 * 1024,  # 1 GB
     "business": 10 * 1024 * 1024 * 1024, # 10 GB
 }
 
@@ -41,8 +41,8 @@ def save_history():
     if not data:
         return jsonify({"success": False, "message": "No data provided."}), 400
 
-    tier = user.get("storage_tier", "gratis")
-    limit = TIER_LIMITS.get(tier, TIER_LIMITS["gratis"])
+    tier = user.get("storage_tier", "free")
+    limit = TIER_LIMITS.get(tier, TIER_LIMITS["free"])
 
     # hitung usage sama persis dengan storage_info
     history_size = get_history_usage_bytes(user)
@@ -134,11 +134,16 @@ def storage_info():
     user = load_user(username)
     print("USER =", user)
 
+    # TAMBAH INI
+    import json
+    print("USER DETAIL =")
+    print(json.dumps(user, indent=2))
+    
     if not user:
         return jsonify({"success": False}), 404
 
-    tier = user.get("storage_tier", "gratis")
-    limit = TIER_LIMITS.get(tier, TIER_LIMITS["gratis"])
+    tier = user.get("storage_tier", "free")
+    limit = TIER_LIMITS.get(tier, TIER_LIMITS["free"])
 
     # history size
     history_size = get_history_usage_bytes(user)
@@ -154,8 +159,31 @@ def storage_info():
                 csv_paths.add(candidate)
                 
     csv_size = sum(os.path.getsize(path) for path in csv_paths)
+    
+    from utils.registry import get_model_dir_for_user
+    from config import MODEL_FOLDER
+    import glob
 
-    usage = history_size + csv_size
+    model_dir  = get_model_dir_for_user(username)
+    model_size = 0
+    if os.path.exists(model_dir):
+        for fname in os.listdir(model_dir):
+            fpath = os.path.join(model_dir, fname)
+            if os.path.isfile(fpath):
+                model_size += os.path.getsize(fpath)
+
+    # snapshot size (models/snapshots/<username>/**)
+    snap_base = os.path.join(MODEL_FOLDER, "snapshots", username)
+    snap_size = 0
+    if os.path.exists(snap_base):
+        for fpath in glob.glob(os.path.join(snap_base, "**", "*"), recursive=True):
+            if os.path.isfile(fpath):
+                snap_size += os.path.getsize(fpath)
+
+    # hash cache count
+    hash_count = len(user.get("snapshots", []))
+
+    usage = history_size + csv_size + model_size + snap_size
 
     print("HISTORY COUNT =", len(user.get("history", [])))
     print("HISTORY SIZE =", history_size)
@@ -163,13 +191,19 @@ def storage_info():
     print("TOTAL USAGE =", usage)
 
     return jsonify({
-        "success": True,
-        "tier": tier,
-        "usage": usage,
-        "limit": limit,
-        "usage_mb": round(usage / 1024 / 1024, 4),
-        "limit_mb": round(limit / 1024 / 1024, 2),
-        "percent": round((usage / limit) * 100, 4),
+        "success":    True,
+        "tier":       tier,
+        "usage":      usage,
+        "limit":      limit,
+        "usage_mb":   round(usage / 1024 / 1024, 4),
+        "limit_mb":   round(limit / 1024 / 1024, 2),
+        "percent":    round((usage / limit) * 100, 4),
+        "history_mb": round(history_size / 1024 / 1024, 4),
+        "csv_mb":     round(csv_size / 1024 / 1024, 4),
+        "model_mb":   round(model_size / 1024 / 1024, 4),
+        "snap_mb":    round(snap_size / 1024 / 1024, 4),
+        "hash_count": hash_count,
+        "snapshot_limit":  get_snapshot_limit(tier)
     })
 
 # =========================

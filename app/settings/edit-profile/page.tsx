@@ -163,7 +163,7 @@ export default function EditProfilePage() {
               Kembali ke Settings
             </button>
 
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 ml-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6 ml-8 cursor-default">
               Edit Profile
             </h2>
 
@@ -187,7 +187,7 @@ export default function EditProfilePage() {
                 hidden
                 onChange={handleAvatarChange}
               />
-              <div>
+              <div className="cursor-default">
                 <p className="text-sm font-medium text-gray-700 mb-1">
                   Foto Profil
                 </p>
@@ -209,7 +209,7 @@ export default function EditProfilePage() {
             <div className="bg-white border border-gray-100 rounded-xl divide-y divide-gray-100 max-w-4xl ml-12">
               {/* Nama */}
               <div className="flex items-center justify-between py-4 px-12">
-                <div>
+                <div className="cursor-default">
                   <p className="text-sm text-gray-700">Nama</p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     Nama yang ditampilkan di aplikasi
@@ -225,7 +225,7 @@ export default function EditProfilePage() {
 
               {/* Email */}
               <div className="flex items-center justify-between py-4 px-12">
-                <div>
+                <div className="cursor-default">
                   <p className="text-sm text-gray-700">Email</p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     Email akun Anda
@@ -241,7 +241,7 @@ export default function EditProfilePage() {
 
               {/* Username (readonly) */}
               <div className="flex items-center justify-between py-4 px-12">
-                <div>
+                <div className="cursor-default">
                   <p className="text-sm text-gray-700">Username</p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     Username tidak dapat diubah
@@ -255,14 +255,14 @@ export default function EditProfilePage() {
 
             {/* PASSWORD */}
             <div className="bg-white border border-gray-100 rounded-xl divide-y divide-gray-100 max-w-4xl ml-12 mt-6">
-              <div className="px-12 py-2">
+              <div className="px-12 py-2 cursor-default">
                 <p className="text-md font-bold text-gray-700 my-2">
                   Change Password
                 </p>
               </div>
 
               <div className="flex items-center justify-between py-4 px-12">
-                <div>
+                <div className="cursor-default">
                   <p className="text-sm text-gray-700">Password Saat Ini</p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     Masukkan password yang sekarang
@@ -278,7 +278,7 @@ export default function EditProfilePage() {
                   <button
                     type="button"
                     onClick={() => setShowCurrentPw(!showCurrentPw)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
                   >
                     {showCurrentPw ? (
                       <svg
@@ -320,7 +320,7 @@ export default function EditProfilePage() {
               </div>
 
               <div className="flex items-center justify-between py-4 px-12">
-                <div>
+                <div className="cursor-default">
                   <p className="text-sm text-gray-700">Password Baru</p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     Minimal 4 karakter
@@ -336,7 +336,7 @@ export default function EditProfilePage() {
                   <button
                     type="button"
                     onClick={() => setShowNewPw(!showNewPw)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
                   >
                     {showNewPw ? (
                       <svg
@@ -378,7 +378,7 @@ export default function EditProfilePage() {
               </div>
 
               <div className="flex items-center justify-between py-4 px-12">
-                <div>
+                <div className="cursor-default">
                   <p className="text-sm text-gray-700">Konfirmasi Password</p>
                   <p className="text-xs text-gray-400 mt-0.5">
                     Ulangi password baru
@@ -394,7 +394,7 @@ export default function EditProfilePage() {
                   <button
                     type="button"
                     onClick={() => setShowConfirmPw(!showConfirmPw)}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 cursor-pointer"
                   >
                     {showConfirmPw ? (
                       <svg

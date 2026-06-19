@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, session, request 
+from flask import Blueprint, jsonify, session, request
 import os
 import shutil
 
@@ -31,29 +31,31 @@ def get_snapshots():
     if not user:
         return jsonify({"success": False, "message": "User not found."}), 404
 
-    tier     = user.get("storage_tier", "gratis")
-    limit    = SNAPSHOT_LIMITS.get(tier, SNAPSHOT_LIMITS["gratis"])
+    tier = user.get("storage_tier", "free")
+    limit = SNAPSHOT_LIMITS.get(tier, SNAPSHOT_LIMITS["free"])
     snapshots = user.get("snapshots", [])
 
     # Sanitize — jangan expose model_dir path ke FE
     result = [
         {
-            "id":         s.get("id"),
-            "dataset":    s.get("dataset"),
-            "hash":       s.get("hash"),
+            "id": s.get("id"),
+            "dataset": s.get("dataset"),
+            "hash": s.get("hash"),
             "trained_at": s.get("trained_at"),
-            "metrics":    s.get("metrics", {}),
+            "metrics": s.get("metrics", {}),
         }
         for s in snapshots
     ]
 
-    return jsonify({
-        "success":  True,
-        "tier":     tier,
-        "limit":    limit,
-        "count":    len(snapshots),
-        "snapshots": result,
-    })
+    return jsonify(
+        {
+            "success": True,
+            "tier": tier,
+            "limit": limit,
+            "count": len(snapshots),
+            "snapshots": result,
+        }
+    )
 
 
 # =========================
@@ -101,39 +103,38 @@ def restore_snapshot_route(snapshot_id):
     if not username:
         return jsonify({"success": False, "message": "Not logged in."}), 401
 
+    # ✅ Restore + baca registry LOKAL dari folder snapshot — sumber kebenaran independen
+    registry = restore_snapshot(username, snapshot_id)
+    if not registry:
+        return jsonify({"success": False, "message": "Gagal restore snapshot atau registry.json tidak ditemukan."}), 500
+
     user = load_user(username)
     if not user:
         return jsonify({"success": False, "message": "User not found."}), 404
 
-    snapshots = user.get("snapshots", [])
-    snap = next((s for s in snapshots if s["id"] == snapshot_id), None)
+    # ✅ Update metrics di user JSON DULU — pakai data dari registry LOKAL
+    user["metrics"] = registry.get("metrics", {})
+    save_user(user)
 
-    if not snap:
-        return jsonify({"success": False, "message": "Snapshot tidak ditemukan."}), 404
-
-    # Restore model files ke model aktif
-    ok = restore_snapshot(username, snapshot_id)
-    if not ok:
-        return jsonify({"success": False, "message": "Gagal restore snapshot."}), 500
-
-    # Update active_dataset ke dataset snapshot ini
+    # Update active_dataset ke dataset dari registry LOKAL, lalu reload globals
     from utils.dataset import set_active_dataset_path_for_user
     from config import UPLOAD_FOLDER
 
-    dataset_path = os.path.join(UPLOAD_FOLDER, snap.get("dataset", ""))
+    dataset_path = os.path.join(UPLOAD_FOLDER, registry.get("dataset", ""))
+    print(f"🔍 RESTORE dataset_path: {dataset_path}")
+    print(f"🔍 RESTORE exists: {os.path.exists(dataset_path)}")
+    print(f"🔍 RESTORE username: {username}")
 
     if os.path.exists(dataset_path):
-        set_active_dataset_path_for_user(dataset_path)
+        set_active_dataset_path_for_user(dataset_path, username=username)
         reload_all_globals(dataset_path, username=username)
 
-    # Update metrics di user JSON biar matching sama model yang di-restore
-    user["metrics"] = snap.get("metrics", {})
-    save_user(user)
-
-    return jsonify({
-        "success":    True,
-        "message":    "Snapshot berhasil di-restore.",
-        "snapshot_id": snapshot_id,
-        "dataset":    snap.get("dataset"),
-        "trained_at": snap.get("trained_at"),
-    })
+    return jsonify(
+        {
+            "success": True,
+            "message": "Snapshot berhasil di-restore.",
+            "snapshot_id": snapshot_id,
+            "dataset": registry.get("dataset"),
+            "trained_at": registry.get("trained_at"),
+        }
+    )

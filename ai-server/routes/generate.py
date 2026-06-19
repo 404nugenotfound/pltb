@@ -30,8 +30,11 @@ generate_bp = Blueprint("generate", __name__)
 # =========================
 @generate_bp.route("/generate_progress")
 def get_progress():
+    username = session.get("username")
+    if not username:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
     with progress_lock:
-        username = session.get("username")
         p = generate_progress.get(username, {})
 
     elapsed = time.time() - p["start_time"] if p.get("start_time") else 0
@@ -66,6 +69,8 @@ def get_progress():
 @generate_bp.route("/generate_commit", methods=["POST"])
 def generate_commit():
     username = session.get("username")
+    if not username:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
 
     with progress_lock:
         p = generate_progress.get(username, {})
@@ -86,11 +91,11 @@ def _worker_generate_full(
     username, selected_model, active_models, output_mode, selected_var, dataset_path
 ):
 
-    from app import df
     from training.load_ml import load_ml_for_var
     from training.load_dl import load_dl_for_var
     from training.feature_engineering import load_and_engineer
 
+    df = load_and_engineer(dataset_path, target_var=TARGET)
     # ✅ Load model per variabel
     gbr, xgb, knn, scaler, FEATURES = load_ml_for_var(selected_var, username=username)
     print("ML FEATURES =", FEATURES)
@@ -239,7 +244,7 @@ def _worker_generate_full(
                     fv.append(float(np.sin(np.deg2rad(target_series[-1]))))
                 elif col == "WD10M_cos":
                     fv.append(float(np.cos(np.deg2rad(target_series[-1]))))
-                elif col == "T2M":  # ← TAMBAH INI
+                elif col == "T2M":
                     same_hour = df[df["HR"] == next_time.hour]["T2M"].mean()
                     fv.append(float(same_hour))
                 elif col == "std24":
@@ -414,7 +419,6 @@ def _worker_generate_full(
 # BACKGROUND WORKER — GENERATE BEST
 # =========================
 def _worker_generate_best(username: str, dataset_path: str) -> None:
-    from app import df
     from training.load_ml import load_ml_for_var
     from training.load_dl import load_dl_for_var
     from training.metrics import (
@@ -426,7 +430,8 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
     from training.nlp import build_forecast_text, generate_nlp_report_best
     from training.feature_engineering import load_and_engineer
     from tensorflow.keras.models import load_model as _load
-
+    
+    df = load_and_engineer(dataset_path, target_var=TARGET)
     try:
         np.random.seed(42)
 
@@ -462,9 +467,8 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
             scaler_X = dl_state["scaler_X"]
             scaler_y = dl_state["scaler_y"]
             DL_INPUT_COLS = dl_state["DL_INPUT_COLS"]
-            is_circular = dl_state.get("is_circular", False)  # ← tambah
+            is_circular = dl_state.get("is_circular", False)
 
-            # ✅ Helper decode per variabel
             def decode_dl(raw):
                 if is_circular:
                     return np.rad2deg(np.arctan2(raw[:, 0], raw[:, 1])) % 360
@@ -520,7 +524,6 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
             X = np.array(df_var[FEATURES].values) if ML_READY else np.array([])
             y = np.array(df_var[var].values)
 
-            # — Stacking metrics historis — ✅ Bug 1 fix
             _X_sc = np.array(
                 scaler_X.transform(df_var[_dl_cols].values), dtype=np.float32
             )
@@ -530,7 +533,6 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
             split_train = int(n * 0.8)
             split_val   = int(n * 0.9)
 
-            # --- TRAIN predictions ---
             raw_train = []
             for start in range(STEP, split_train, BATCH):
                 end = min(start + BATCH, split_train)
@@ -541,7 +543,6 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
             stacked_train_preds = decode_dl(np.concatenate(raw_train, axis=0))
             y_train_slice = y[STEP:split_train]
 
-            # --- TEST predictions ---
             raw_test = []
             for start in range(split_val, n, BATCH):
                 end = min(start + BATCH, n)
@@ -552,7 +553,6 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
             stacked_test_preds = decode_dl(np.concatenate(raw_test, axis=0))
             y_test_slice = y[split_val:]
 
-            # --- Metrics terpisah ---
             train_metrics = get_metrics_for_var(
                 np.array(y_train_slice),
                 np.array(stacked_train_preds[:len(y_train_slice)]),
@@ -563,9 +563,8 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
                 np.array(stacked_test_preds[:len(y_test_slice)]),
                 var,
             )
-            stacking_metrics = test_metrics  # untuk NLP report & stacking_info
+            stacking_metrics = test_metrics
 
-            # --- ALL data untuk chart historis ---
             raw_all = []
             for start in range(STEP, n, BATCH):
                 end = min(start + BATCH, n)
@@ -626,7 +625,6 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
                 mean3 = float(np.mean(target_series[-3:]))
                 mean24 = float(np.mean(target_series[-24:]))
 
-                # ✅ Bug 3 fix — tambah handler sin/cos
                 fv = []
                 for col in FEATURES:
                     if col == "lag1":
@@ -658,7 +656,6 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
                     elif col == "WD10M_cos":
                         fv.append(float(np.cos(np.deg2rad(target_series[-1]))))
                     elif col == "T2M":
-                        # ambil rata-rata T2M di jam yang sama dari historis
                         same_hour = df[df["HR"] == next_time.hour]["T2M"].mean()
                         fv.append(float(same_hour))
                     else:
@@ -683,7 +680,6 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
                 new_row["lag24"] = lag24
                 new_row["mean3"] = mean3
                 new_row["mean24"] = mean24
-                # ✅ Bug 4 fix — update sin/cos SEBELUM concat
                 if var == "WD10M":
                     if "WD10M_sin" in new_row.index:
                         new_row["WD10M_sin"] = float(np.sin(np.deg2rad(pred_xgb)))
@@ -701,7 +697,6 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
                 window_sc = scaler_X.transform(history_window[_dl_cols].values)
                 seq_future = window_sc.reshape(1, STEP, window_sc.shape[1])
 
-                # ✅ Bug 2 fix — pakai decode_dl
                 pred_stacked = float(decode_dl(_lstm.predict(seq_future, verbose=0))[0])
                 if lo is not None:
                     pred_stacked = float(np.clip(pred_stacked, lo, hi))
@@ -841,8 +836,10 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
 # =========================
 @generate_bp.route("/generate_full", methods=["POST"])
 def generate_full():
-
     username = session.get("username")
+    if not username:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
     dataset_path = get_active_dataset_path_for_user()
     selected_var = request.form.get("var", "WS10M")
     print(f"🔍 SELECTED VAR: {selected_var}")
@@ -865,7 +862,6 @@ def generate_full():
 
     selected_model = request.form.get("model", "all")
 
-    # ✅ Gunakan metrics per variabel untuk tentukan active_models
     metrics_var = load_metrics_for_var(selected_var, username=username)
     metrics_dl_var = load_dl_metrics_for_var(selected_var, username=username)
     all_models = list(metrics_var.keys()) + list(metrics_dl_var.keys())
@@ -891,6 +887,9 @@ def generate_full():
 @generate_bp.route("/generate_best", methods=["POST"])
 def generate_best():
     username = session.get("username")
+    if not username:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
     dataset_path = get_active_dataset_path_for_user()
 
     with progress_lock:
@@ -901,7 +900,7 @@ def generate_best():
             "running": True,
             "done": False,
             "day": 0,
-            "total": 7 * len(TRAIN_VARS),  # ✅ 7 hari × 3 variabel
+            "total": 7 * len(TRAIN_VARS),
             "mode": "Best Stacking (All Variables)",
             "start_time": time.time(),
             "error": None,
@@ -909,7 +908,6 @@ def generate_best():
             "cancel": False,
         }
 
-    # ✅ Validasi minimal satu variabel punya metrics
     any_ready = any(load_metrics_for_var(var, username=username) for var in TRAIN_VARS)
     if not any_ready:
         with progress_lock:
@@ -926,7 +924,7 @@ def generate_best():
 
     threading.Thread(
         target=_worker_generate_best,
-        args=(username, dataset_path),  # ✅ tidak perlu selected_var
+        args=(username, dataset_path),
         daemon=True,
     ).start()
 
@@ -939,6 +937,9 @@ def generate_best():
 @generate_bp.route("/cancel_generate", methods=["POST"])
 def cancel_generate():
     username = session.get("username")
+    if not username:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
     with progress_lock:
         if username in generate_progress:
             generate_progress[username]["cancel"] = True
@@ -951,6 +952,9 @@ def cancel_generate():
 @generate_bp.route("/download_full/<mode>")
 def download_full(mode):
     username = session.get("username")
+    if not username:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
     filename = (
         f"{username}_hasil_prediksi_best.csv"
         if mode == "best"
@@ -967,6 +971,10 @@ def download_full(mode):
 # =========================
 @generate_bp.route("/overview_data")
 def overview_data():
+    username = session.get("username")
+    if not username:
+        return jsonify({"status": "error", "message": "Unauthorized"}), 401
+
     return jsonify(
         {
             "nlp_report": session.get("nlp_report", ""),

@@ -147,10 +147,15 @@ def forecasting_data():
 
     username     = request.headers.get("X-Username") or session.get("username")
     selected_var = request.args.get("var", TARGET)
+    
+    print(f"🔍 forecasting_data username={username} var={selected_var}") 
 
     all_metrics = {}
     all_metrics.update(load_metrics_for_var(selected_var, username=username))
     all_metrics.update(load_dl_metrics_for_var(selected_var, username=username))
+    
+    print(f"🔍 all_metrics keys={list(all_metrics.keys())}")  # ← tambah
+    print(f"🔍 XGB MAE={all_metrics.get('XGB', {}).get('MAE')}")  # ← tambah
 
     if not all_metrics:
         all_metrics = {

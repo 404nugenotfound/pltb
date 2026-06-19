@@ -16,7 +16,7 @@ export function useUploadDataset() {
     visible: false,
     snapshotCount: 0,
     snapshotLimit: 0,
-    tier: "gratis",
+    tier: "free",
     pendingFilename: "",
   });
 

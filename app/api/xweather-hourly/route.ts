@@ -4,29 +4,18 @@ export async function GET(req: NextRequest) {
   const lat = req.nextUrl.searchParams.get("lat");
   const lng = req.nextUrl.searchParams.get("lng");
 
-  const clientId = "JBovq7TP7N6HlJag1yqNn";
-  const clientSecret = "tw1JdQhj4koCl9e1RhFmWeMEntNKUxeIpn5Po4Za";
+  const clientId = process.env.NEXT_PUBLIC_XWEATHER_CLIENT_ID;
+  const clientSecret = process.env.NEXT_PUBLIC_XWEATHER_CLIENT_SECRET;
 
-  const url = `https://api.xweather.com/forecasts/${lat},${lng}?client_id=${clientId}&client_secret=${clientSecret}&filter=1hr&limit=168&units=metric`;
-
-  console.log("=== XWeather Hourly called ===");
-  console.log("URL:", url);
+  // ✅ Pakai data.api.xweather.com bukan api.xweather.com
+  const url = `https://data.api.xweather.com/forecasts/${lat},${lng}?client_id=${clientId}&client_secret=${clientSecret}&filter=1hr&limit=168&fields=periods.dateTimeISO,periods.tempC,periods.humidity,periods.windSpeedKPH,periods.windDirDEG`;
 
   try {
     const res = await fetch(url);
     const text = await res.text();
-
-    console.log("Status:", res.status);
-    console.log("Response:", text.substring(0, 800));
-
-    if (!res.ok) {
-      return NextResponse.json({ error: text }, { status: res.status });
-    }
-
-    const data = JSON.parse(text);
-    return NextResponse.json(data);
+    if (!res.ok) return NextResponse.json({ error: text }, { status: res.status });
+    return NextResponse.json(JSON.parse(text));
   } catch (err) {
-    console.error("Error:", err);
     return NextResponse.json({ error: String(err) }, { status: 500 });
   }
 }

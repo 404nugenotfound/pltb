@@ -1,5 +1,5 @@
 "use client";
-import { createContext, useContext, useRef, useState, useCallback } from "react";
+import { createContext, useContext, useRef, useState, useCallback, useEffect } from "react";
 
 interface GenerateState {
   visible: boolean;
@@ -57,17 +57,15 @@ export function GenerateProvider({ children }: { children: React.ReactNode }) {
       if (prog.done) {
         pollActive.current = false;
         setGenerate(prev => ({ ...prev, percent: 100 }));
-
         await fetch("http://localhost:5000/generate_commit", {
           method: "POST",
           credentials: "include",
         });
-
         setTimeout(() => {
           setGenerate(DEFAULT);
           onDone?.(
             prog.nlp_report ?? "",
-            prog.ensemble_summary ?? {}   // ← pass ensemble_summary
+            prog.ensemble_summary ?? {}
           );
         }, 1000);
         return;
@@ -81,6 +79,33 @@ export function GenerateProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // ✅ Resume toast otomatis pas refresh — tanya BE dulu, bukan localStorage
+  useEffect(() => {
+    const resume = async () => {
+      // Kalau pollActive udah true (startGenerate baru dipanggil), skip
+      if (pollActive.current) return;
+      try {
+        const res = await fetch("/api/generate-progress");
+        const prog = await res.json();
+        // Hanya resume kalau BE konfirmasi masih running
+        if (prog.running && !prog.done && !prog.error) {
+          pollActive.current = true;
+          setGenerate({
+            visible: true,
+            percent: Math.floor((prog.day / prog.total) * 100),
+            status: `Generating Day ${prog.day}/${prog.total}`,
+            eta: prog.eta,
+            elapsed: prog.elapsed,
+          });
+          pollOnce(); // resume tanpa onDone — refresh = gak ada callback
+        }
+      } catch {
+        // Gagal fetch → diam, jangan tampilin apa-apa
+      }
+    };
+    resume();
+  }, [pollOnce]);
+
   const startGenerate = useCallback(async (
     selectedModel: string,
     onDone?: (nlp: string, ensembleSummary: Record<string, any>) => void,
@@ -92,17 +117,14 @@ export function GenerateProvider({ children }: { children: React.ReactNode }) {
       const formData = new FormData();
       formData.append("model", selectedModel);
       formData.append("var", selectedVar);
-
       const endpoint = selectedModel === "best" ? "/api/generate-best" : "/api/generate";
       const res = await fetch(endpoint, { method: "POST", body: formData });
       const data = await res.json();
-
       if (data.status === "already_running") {
         setGenerate(DEFAULT);
         alert("Generate masih berjalan, tunggu sebentar.");
         return;
       }
-
       pollActive.current = true;
       pollOnce(onDone);
     } catch (err) {

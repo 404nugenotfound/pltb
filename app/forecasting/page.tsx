@@ -9,6 +9,7 @@ import MetricsSection from "@/app/components/metrics/MetricsSection";
 import ProgressToast from "@/app/components/toast/ProgressToast";
 import { useMetrics } from "@/app/hooks/useMetrics";
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation"; 
 import { useGenerateContext } from "@/app/context/GenerateContext";
 
 export default function ForecastingPage() {
@@ -23,6 +24,12 @@ export default function ForecastingPage() {
 
   const { dataset_name, metrics, best_models = [], stacking_metrics = {}, refreshMetrics } = useMetrics(selectedVars);
   const { generate, startGenerate } = useGenerateContext();
+
+  const pathname = usePathname();
+
+  useEffect(() => {
+    refreshMetrics();
+  }, []); // cukup on mount
 
   // Restore state dari sessionStorage
   useEffect(() => {
