@@ -139,7 +139,7 @@ def upload_dataset():
     # =========================
     from utils.cache_settings import get_cache_settings
 
-    settings = get_cache_settings()
+    settings = get_cache_settings(username)
 
     already_trained, _ = is_dataset_already_trained(final_path, username)
 

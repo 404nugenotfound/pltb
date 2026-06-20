@@ -28,7 +28,7 @@ def load_or_compute_metrics(
         print("⚠️ Skip load metrics — model belum tersedia")
         return {}, {}
 
-    settings = get_cache_settings()
+    settings = get_cache_settings(username)
 
     if not settings["metrics_cache"]:
         print("⚠️ Metrics cache disabled")

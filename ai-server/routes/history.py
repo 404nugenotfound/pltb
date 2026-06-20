@@ -183,7 +183,7 @@ def storage_info():
     # hash cache count
     hash_count = len(user.get("snapshots", []))
 
-    usage = history_size + csv_size + model_size + snap_size
+    usage = history_size + csv_size + model_size
 
     print("HISTORY COUNT =", len(user.get("history", [])))
     print("HISTORY SIZE =", history_size)
