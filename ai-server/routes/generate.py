@@ -30,7 +30,7 @@ generate_bp = Blueprint("generate", __name__)
 # =========================
 @generate_bp.route("/generate_progress")
 def get_progress():
-    username = session.get("username")
+    username = request.headers.get("X-Username") or session.get("username")
     if not username:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
 
@@ -68,7 +68,7 @@ def get_progress():
 # =========================
 @generate_bp.route("/generate_commit", methods=["POST"])
 def generate_commit():
-    username = session.get("username")
+    username = request.headers.get("X-Username") or session.get("username")
     if not username:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
 
@@ -836,11 +836,11 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
 # =========================
 @generate_bp.route("/generate_full", methods=["POST"])
 def generate_full():
-    username = session.get("username")
+    username = request.headers.get("X-Username") or session.get("username")
     if not username:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
 
-    dataset_path = get_active_dataset_path_for_user()
+    dataset_path = get_active_dataset_path_for_user(username=username)
     selected_var = request.form.get("var", "WS10M")
     print(f"🔍 SELECTED VAR: {selected_var}")
 
@@ -886,11 +886,11 @@ def generate_full():
 # =========================
 @generate_bp.route("/generate_best", methods=["POST"])
 def generate_best():
-    username = session.get("username")
+    username = request.headers.get("X-Username") or session.get("username")
     if not username:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
 
-    dataset_path = get_active_dataset_path_for_user()
+    dataset_path = get_active_dataset_path_for_user(username=username)
 
     with progress_lock:
         if generate_progress.get(username, {}).get("running"):
@@ -936,7 +936,7 @@ def generate_best():
 # =========================
 @generate_bp.route("/cancel_generate", methods=["POST"])
 def cancel_generate():
-    username = session.get("username")
+    username = request.headers.get("X-Username") or session.get("username")
     if not username:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
 
@@ -951,7 +951,7 @@ def cancel_generate():
 # =========================
 @generate_bp.route("/download_full/<mode>")
 def download_full(mode):
-    username = session.get("username")
+    username = request.headers.get("X-Username") or session.get("username")
     if not username:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
 
@@ -971,7 +971,7 @@ def download_full(mode):
 # =========================
 @generate_bp.route("/overview_data")
 def overview_data():
-    username = session.get("username")
+    username = request.headers.get("X-Username") or session.get("username")
     if not username:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
 

@@ -5,9 +5,16 @@ export async function uploadDataset(formData: FormData) {
   const res = await fetch("/api/upload", {
     method: "POST",
     body: formData,
-  })
+  });
 
-  return res.json()
+  const text = await res.text();
+  if (!text) throw { message: "Server tidak merespons" };
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw { message: "Response server tidak valid" };
+  }
 }
 
 export function downloadCsv(mode: "general" | "best") {

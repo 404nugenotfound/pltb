@@ -5,13 +5,13 @@ import Sidebar from '@/app/components/layout/Sidebar';
 import { UsersTab } from '@/app/components/admin/UsersTab';
 import { DeleteConfirmModal } from '@/app/components/admin/DeleteConfirmModal';
 import { useAdminData } from '@/app/hooks/useAdminData';
-import { User } from '@/app/types/admin.types';
 
 export default function UsersPage() {
-  const { users, dashboardStats, deleteUser, activateUser, getUserUsageToday } = useAdminData();
+  const { users, dashboardStats, activateUser, getUserUsageToday } = useAdminData();
   const [searchUser, setSearchUser] = useState('');
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
-  const userToDelete = users.find(u => u.id === showDeleteConfirm);
+  const [usernameToConfirm, setUsernameToConfirm] = useState<string | null>(null);
+
+  const targetUser = users.find(u => u.username === usernameToConfirm);
 
   return (
     <div className="flex h-screen">
@@ -28,8 +28,7 @@ export default function UsersPage() {
               users={users}
               searchQuery={searchUser}
               onSearchChange={setSearchUser}
-              onEditUser={(user: User) => {}}
-              onDeactivateUser={(id) => setShowDeleteConfirm(id)}
+              onDeactivateUser={(username) => setUsernameToConfirm(username)}
               onActivateUser={activateUser}
               getUserUsageToday={getUserUsageToday}
             />
@@ -37,10 +36,16 @@ export default function UsersPage() {
         </div>
       </main>
       <DeleteConfirmModal
-        isOpen={!!showDeleteConfirm}
-        username={userToDelete?.username || ''}
-        onConfirm={() => showDeleteConfirm && deleteUser(showDeleteConfirm) && setShowDeleteConfirm(null)}
-        onCancel={() => setShowDeleteConfirm(null)}
+        isOpen={!!usernameToConfirm}
+        username={targetUser?.username || ''}
+        mode="deactivate"
+        onConfirm={() => {
+          if (usernameToConfirm) {
+            activateUser(usernameToConfirm, false);
+            setUsernameToConfirm(null);
+          }
+        }}
+        onCancel={() => setUsernameToConfirm(null)}
       />
     </div>
   );

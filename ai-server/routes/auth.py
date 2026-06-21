@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify, session
 import json
 import os
+from functools import wraps
+from datetime import date
 from config import USER_FOLDER
 from utils.recaptcha import verify_recaptcha
 from utils.progress import (
@@ -14,6 +16,7 @@ from utils.user_helpers import load_user, save_user, user_path
 auth_bp = Blueprint("auth_bp", __name__)
 
 ADMINS_FILE = "admins.json"
+LOGIN_COUNT_FILE = "login_count.json"
 
 # Default admin
 DEFAULT_ADMINS = [
@@ -24,6 +27,53 @@ DEFAULT_ADMINS = [
         "name":     "Administrator"
     }
 ]
+
+
+# =========================
+# ADMIN GUARD
+# =========================
+
+def require_admin(f):
+    """Tolak request kalau session bukan punya admin yang login.
+    Dipasang di semua endpoint admin panel (users, user-data, admins, login-count)
+    biar gak bisa diakses sembarangan cuma dengan tau URL-nya."""
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        if session.get("role") != "admin":
+            return jsonify({"success": False, "message": "Admin access required."}), 403
+        return f(*args, **kwargs)
+    return wrapper
+
+
+# =========================
+# LOGIN COUNT (harian)
+# =========================
+
+def increment_login_count_today() -> None:
+    counts = {}
+    if os.path.exists(LOGIN_COUNT_FILE):
+        with open(LOGIN_COUNT_FILE, "r") as f:
+            try:
+                counts = json.load(f)
+            except json.JSONDecodeError:
+                counts = {}
+
+    today = date.today().isoformat()
+    counts[today] = counts.get(today, 0) + 1
+
+    with open(LOGIN_COUNT_FILE, "w") as f:
+        json.dump(counts, f, indent=2)
+
+
+def get_login_count_today() -> int:
+    if not os.path.exists(LOGIN_COUNT_FILE):
+        return 0
+    with open(LOGIN_COUNT_FILE, "r") as f:
+        try:
+            counts = json.load(f)
+        except json.JSONDecodeError:
+            return 0
+    return counts.get(date.today().isoformat(), 0)
 
 
 # =========================
@@ -164,6 +214,8 @@ def login():
     session["role"] = found["role"]
     session.modified = True
 
+    increment_login_count_today()
+
     print("LOGIN SESSION =", dict(session))
 
     return jsonify({
@@ -268,8 +320,65 @@ def change_password():
 # =========================
 
 @auth_bp.route("/users", methods=["GET"])
+@require_admin
 def get_users():
     return jsonify(load_all_users())
+
+
+# =========================
+# GET / UPDATE USER DATA (admin panel: isActive, resourceLimits, storageLimitMb)
+# =========================
+
+@auth_bp.route("/user-data/<username>", methods=["GET"])
+@require_admin
+def get_user_data(username):
+    user = load_user(username)
+    if not user:
+        return jsonify({"success": False, "message": "User not found."}), 404
+
+    return jsonify({
+        "resourceLimits": user.get("resourceLimits", {}),
+        "history":        user.get("history", []),
+        "storageLimitMb": user.get("storageLimitMb"),
+        "isActive":       user.get("isActive", True),
+    })
+
+
+@auth_bp.route("/user-data/<username>", methods=["PUT"])
+@require_admin
+def update_user_data(username):
+    user = load_user(username)
+    if not user:
+        return jsonify({"success": False, "message": "User not found."}), 404
+
+    data = request.get_json() or {}
+
+    if "isActive" in data:
+        user["isActive"] = bool(data["isActive"])
+
+    if "storageLimitMb" in data:
+        user["storageLimitMb"] = data["storageLimitMb"]
+
+    if "resourceLimits" in data and isinstance(data["resourceLimits"], dict):
+        # merge per-feature, bukan replace total — biar feature lain yang
+        # gak ikut dikirim di request ini gak ketimpa jadi hilang
+        existing = user.get("resourceLimits", {})
+        existing.update(data["resourceLimits"])
+        user["resourceLimits"] = existing
+
+    save_user(user)
+
+    return jsonify({"success": True})
+
+
+# =========================
+# LOGIN COUNT HARI INI (admin panel)
+# =========================
+
+@auth_bp.route("/login-count", methods=["GET"])
+@require_admin
+def login_count():
+    return jsonify({"count": get_login_count_today()})
 
 
 # =========================
@@ -277,5 +386,6 @@ def get_users():
 # =========================
 
 @auth_bp.route("/admins", methods=["GET"])
+@require_admin
 def get_admins():
     return jsonify(load_admins())

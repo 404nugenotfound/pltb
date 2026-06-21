@@ -67,13 +67,9 @@ def get_metrics_for_var(y_true, y_pred, var_name: str = "WS10M"):
         diff = np.abs(yt - yp) % 360
         diff = np.where(diff > 180, 360 - diff, diff)
 
-        # Circular MAE
         circular_mae = round(float(np.mean(diff)), 3)
-
-        # Circular RMSE
         circular_rmse = round(float(np.sqrt(np.mean(diff**2))), 3)
 
-        # Circular Correlation
         sin_t, cos_t = np.sin(np.deg2rad(yt)), np.cos(np.deg2rad(yt))
         sin_p, cos_p = np.sin(np.deg2rad(yp)), np.cos(np.deg2rad(yp))
         circ_corr = round(
@@ -87,7 +83,6 @@ def get_metrics_for_var(y_true, y_pred, var_name: str = "WS10M"):
             3,
         )
 
-        # Accuracy ±15°
         acc15 = round(float(np.mean(diff <= 15) * 100), 2)
 
         base["CircularMAE"] = circular_mae
@@ -97,7 +92,6 @@ def get_metrics_for_var(y_true, y_pred, var_name: str = "WS10M"):
         base["primary_metric"] = "CircularMAE"
         base["primary_value"] = circular_mae
 
-        # hapus MAE & RMSE linear — tidak relevan untuk data siklikal
         del base["MAE"]
         del base["RMSE"]
         del base["R2"]
@@ -122,7 +116,6 @@ def get_metrics_for_var(y_true, y_pred, var_name: str = "WS10M"):
         base["primary_value"] = round(float(base["MAE"]), 3)
 
     else:
-        # fallback: pakai sMAPE
         denom = (np.abs(yt) + np.abs(yp)) / 2
         mask = denom != 0
         base["sMAPE"] = (
@@ -136,41 +129,59 @@ def get_metrics_for_var(y_true, y_pred, var_name: str = "WS10M"):
     return base
 
 
-def save_metrics(ml, dl, var_name: str = "WS10M", username: str = ""):
+def save_metrics(ml, dl, var_name: str = "WS10M", file_hash: str = "", username: str = ""):
     from utils.user_helpers import load_user, save_user
 
     if not username:
         return
+    file_hash = file_hash or ""
+
     user = load_user(username)
     if not user:
         return
     if "metrics" not in user:
         user["metrics"] = {}
-    user["metrics"][var_name] = {"ml": ml, "dl": dl}
+    if var_name not in user["metrics"]:
+        user["metrics"][var_name] = {}
+    # ✅ nested per file_hash — gak overwrite ensemble dataset lain / hash lain
+    bucket = user["metrics"][var_name].get(file_hash, {})
+    bucket["ml"] = ml
+    bucket["dl"] = dl
+    user["metrics"][var_name][file_hash] = bucket
     save_user(user)
-    print(f"✅ Metrics [{var_name}] disimpan ke user {username}")
+    print(f"✅ Metrics [{var_name}] (hash={file_hash[:8]}) disimpan ke user {username}")
 
 
-def load_metrics(var_name: str = "WS10M", username: str = ""):
+def load_metrics(var_name: str = "WS10M", file_hash: str = "", username: str = ""):
     from utils.user_helpers import load_user
     if not username:
         return None, None
+
     user = load_user(username)
     if not user:
         return None, None
-    metrics = user.get("metrics", {})
-    if var_name in metrics:
-        print(f"✅ Metrics [{var_name}] di-load dari user {username}")
-        return metrics[var_name].get("ml", {}), metrics[var_name].get("dl", {})
+
+    var_data = user.get("metrics", {}).get(var_name, {})
+
+    # Coba hash beneran dulu
+    entry = var_data.get(file_hash)
+
+    # Fallback ke hash kosong kalau gak ketemu (hasil dari restore)
+    if not entry:
+        entry = var_data.get("")
+
+    if entry:
+        print(f"✅ Metrics [{var_name}] (hash={file_hash[:8] if file_hash else 'empty'}) di-load dari user {username}")
+        return entry.get("ml", {}), entry.get("dl", {})
+
     return None, None
 
 
-def load_metrics_for_var(var_name: str, username: str = ""):
+def load_metrics_for_var(var_name: str, file_hash: str = "", username: str = ""):
     """Load metrics untuk forecasting — ambil test metrics saja."""
-    ml, _ = load_metrics(var_name, username=username)
+    ml, _ = load_metrics(var_name, file_hash=file_hash, username=username)
     if not ml:
         return {}
-    # ← flatten: ambil test metrics untuk ditampilkan di dashboard
     result = {}
     for model, val in ml.items():
         if isinstance(val, dict) and "test" in val:
@@ -180,9 +191,9 @@ def load_metrics_for_var(var_name: str, username: str = ""):
     return result
 
 
-def load_dl_metrics_for_var(var_name: str, username: str = ""):
+def load_dl_metrics_for_var(var_name: str, file_hash: str = "", username: str = ""):
     """Load DL metrics untuk forecasting — ambil test metrics saja."""
-    _, dl = load_metrics(var_name, username=username)
+    _, dl = load_metrics(var_name, file_hash=file_hash, username=username)
     if not dl:
         return {}
     result = {}
@@ -208,6 +219,7 @@ def compute_metrics_fresh(
     lstm,
     bilstm,
     var_name: str = "WS10M",
+    file_hash: str = "",
     username: str = "",
 ):
 
@@ -272,17 +284,25 @@ def compute_metrics_fresh(
                 "test":  get_metrics_for_var(y_dl_test,  pred_test,  var_name),
             }
 
-    save_metrics(ml, dl, var_name, username=username)
+    save_metrics(ml, dl, var_name, file_hash=file_hash, username=username)
     return ml, dl
 
 
 def save_ensemble_metrics(
-    var_name: str, ml_name: str, dl_name: str, train_metrics: dict, test_metrics: dict, username: str = ""
+    var_name: str,
+    ml_name: str,
+    dl_name: str,
+    train_metrics: dict,
+    test_metrics: dict,
+    file_hash: str = "",
+    username: str = "",
 ):
     from utils.user_helpers import load_user, save_user
 
     if not username:
         return
+    file_hash = file_hash or ""
+
     user = load_user(username)
     if not user:
         return
@@ -290,26 +310,32 @@ def save_ensemble_metrics(
         user["metrics"] = {}
     if var_name not in user["metrics"]:
         user["metrics"][var_name] = {}
-    user["metrics"][var_name]["ensemble"] = {
+    if file_hash not in user["metrics"][var_name]:
+        user["metrics"][var_name][file_hash] = {}
+
+    user["metrics"][var_name][file_hash]["ensemble"] = {
         "ml_name": ml_name,
         "dl_name": dl_name,
         "components": [ml_name, dl_name],
         f"{ml_name}+{dl_name}": {"train": train_metrics, "test": test_metrics}
     }
     save_user(user)
-    
-    print(f"✅ Ensemble metrics [{var_name}] disimpan ke user {username}")
+
+    print(f"✅ Ensemble metrics [{var_name}] (hash={file_hash[:8]}) disimpan ke user {username}")
 
 
-def load_ensemble_metrics(var_name: str, username: str = ""):
+def load_ensemble_metrics(var_name: str, file_hash: str = "", username: str = ""):
     from utils.user_helpers import load_user
 
     if not username:
         return {}
+    file_hash = file_hash or ""
+
     user = load_user(username)
     if not user:
         return {}
-    ensemble = user.get("metrics", {}).get(var_name, {}).get("ensemble", {})
+    entry = user.get("metrics", {}).get(var_name, {}).get(file_hash, {})
+    ensemble = entry.get("ensemble", {})
     if not ensemble:
         return {}
     ml_name = ensemble.get("ml_name", "")
@@ -318,17 +344,20 @@ def load_ensemble_metrics(var_name: str, username: str = ""):
     return {key: ensemble.get(key, {})}
 
 
-def load_ensemble_components(username: str = ""):
+def load_ensemble_components(file_hash: str = "", username: str = ""):
     from utils.user_helpers import load_user
 
     if not username:
         return {}
+    file_hash = file_hash or ""
+
     user = load_user(username)
     if not user:
         return {}
     result = {}
     for var, val in user.get("metrics", {}).items():
-        components = val.get("ensemble", {}).get("components", [])
+        entry = val.get(file_hash, {})
+        components = entry.get("ensemble", {}).get("components", [])
         if components:
             result[var] = components
     return result

@@ -127,7 +127,10 @@ def restore_snapshot_route(snapshot_id):
 
     if os.path.exists(dataset_path):
         set_active_dataset_path_for_user(dataset_path, username=username)
-        reload_all_globals(dataset_path, username=username)
+        # ✅ FIX — registry harus di-pass biar reload_all_globals masuk branch
+        # "skip recompute" (load_metrics_for_var dari registry), bukan compute_metrics_fresh.
+        # Sebelumnya parameter ini kelewat, jadi restore selalu ngitung ulang metrics dari nol.
+        reload_all_globals(dataset_path, username=username, registry=registry)
 
     return jsonify(
         {

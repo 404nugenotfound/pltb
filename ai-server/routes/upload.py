@@ -27,7 +27,7 @@ upload_bp = Blueprint("upload", __name__)
 @upload_bp.route("/upload_dataset", methods=["POST"])
 def upload_dataset():
 
-    username = session.get("username")
+    username = request.headers.get("X-Username") or session.get("username")
     if not username:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
 
@@ -51,7 +51,7 @@ def upload_dataset():
         if not os.path.exists(final_path):
             return jsonify({"status": "error", "message": "File tidak ditemukan di server."}), 404
 
-        set_active_dataset_path_for_user(final_path)
+        set_active_dataset_path_for_user(final_path, username=username)
 
         with train_lock:
             train_progress[username] = {
@@ -97,6 +97,7 @@ def upload_dataset():
     filename = secure_filename(raw_filename)
 
     pending_path = os.path.join(UPLOAD_FOLDER, f"pending_{filename}")
+    session["pending_dataset"] = pending_path 
 
     file.save(pending_path)
 
@@ -106,9 +107,8 @@ def upload_dataset():
     validation = validate_csv(pending_path)
 
     if not validation["valid"]:
-
         os.remove(pending_path)
-
+        session.pop("pending_dataset", None)
         return (
             jsonify(
                 {
@@ -126,8 +126,8 @@ def upload_dataset():
     final_path = os.path.join(UPLOAD_FOLDER, filename)
 
     shutil.move(pending_path, final_path)
-
-    set_active_dataset_path_for_user(final_path)
+    session.pop("pending_dataset", None)   # ← TAMBAH baris ini
+    set_active_dataset_path_for_user(final_path, username=username)
 
     # =========================
     # HITUNG HASH
@@ -150,17 +150,25 @@ def upload_dataset():
         user = load_user(username)
         snapshots = user.get("snapshots", []) if user else []
         snap = next((s for s in snapshots if s.get("hash") == file_hash), None)
+        registry = None
 
         if snap:
-            # ✅ Restore + baca registry LOKAL dari folder snapshot
             registry = restore_snapshot(username, snap["id"])
 
             if registry and user:
-                # Update metrics dari registry lokal — bukan dari snap di user.json
-                user["metrics"] = registry.get("metrics", {})
-                save_user(user)
+                from training.metrics import save_metrics
 
-        reload_all_globals(final_path, username=username)
+                for var, var_metrics in registry.get("metrics", {}).items():
+                    save_metrics(
+                        var_metrics.get("ml", {}),
+                        var_metrics.get("dl", {}),
+                        var,
+                        file_hash="",  # kosong, biar match sama load_metrics_for_var() default di generate.py
+                        username=username,
+                    )
+                # ga perlu save_user() manual lagi — save_metrics() udah handle sendiri
+
+        reload_all_globals(final_path, username=username, registry=registry)
 
         return jsonify(
             {
@@ -223,7 +231,7 @@ def upload_dataset():
 @upload_bp.route("/train_progress")
 def get_train_progress():
 
-    username = session.get("username")
+    username = request.headers.get("X-Username") or session.get("username")
     if not username:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
 
@@ -250,7 +258,7 @@ def get_train_progress():
 @upload_bp.route("/cancel_training", methods=["POST"])
 def cancel_training():
 
-    username = session.get("username")
+    username = request.headers.get("X-Username") or session.get("username")
     if not username:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
 
@@ -269,7 +277,7 @@ def cancel_training():
 @upload_bp.route("/clear_train_progress", methods=["POST"])
 def clear_train_progress():
 
-    username = session.get("username")
+    username = request.headers.get("X-Username") or session.get("username")
     if not username:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
 
@@ -301,11 +309,11 @@ def cancel_upload():
 @upload_bp.route("/dataset_info")
 def dataset_info():
 
-    username = session.get("username")
+    username = request.headers.get("X-Username") or session.get("username")
     if not username:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
 
-    active_path = get_active_dataset_path_for_user()
+    active_path = get_active_dataset_path_for_user(username=username)
 
     return jsonify(
         {

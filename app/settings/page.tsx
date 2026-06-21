@@ -45,17 +45,18 @@ export default function SettingsPage() {
   }, []);
 
   useEffect(() => {
-    async function loadCacheSettings() {
-      try {
-        const res = await fetch("/api/cache-settings");
-        const data = await res.json();
-        setCacheEnabled(data.model_cache || data.metrics_cache);
-      } catch (err) {
-        console.error("Failed load cache settings", err);
-      }
+  async function loadCacheSettings() {
+    try {
+      const username = sessionStorage.getItem("ventara_username") || "";
+      const res = await fetch(`/api/cache-settings?username=${username}`);
+      const data = await res.json();
+      setCacheEnabled(data.model_cache || data.metrics_cache);
+    } catch (err) {
+      console.error("Failed load cache settings", err);
     }
-    loadCacheSettings();
-  }, []);
+  }
+  loadCacheSettings();
+}, []);
 
   // ── LOAD SNAPSHOTS ──
   useEffect(() => {
@@ -185,18 +186,24 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <button
-                    onClick={async () => {
-                      const newValue = !cacheEnabled;
-                      setCacheEnabled(newValue);
-                      await fetch("/api/cache-settings", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                          model_cache: newValue,
-                          metrics_cache: newValue,
-                        }),
-                      });
-                    }}
+                      onClick={async () => {
+                        const newValue = !cacheEnabled;
+                        const username = sessionStorage.getItem("ventara_username") || "";
+                        setCacheEnabled(newValue);
+                        try {
+                          const res = await fetch(`/api/cache-settings?username=${username}`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              model_cache: newValue,
+                              metrics_cache: newValue,
+                            }),
+                          });
+                          if (!res.ok) throw new Error();
+                        } catch {
+                          setCacheEnabled(!newValue); // revert kalau gagal
+                        }
+                      }}
                     className={`relative w-11 h-6 rounded-full transition-colors duration-200 cursor-pointer ${
                       cacheEnabled ? "bg-teal-500" : "bg-gray-300"
                     }`}

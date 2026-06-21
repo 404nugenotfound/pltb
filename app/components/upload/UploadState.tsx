@@ -48,8 +48,16 @@ export default function UploadState({
           onTrainingComplete?.();
         }),
       // onReload — status "skipped"
-      () => window.location.reload()
+      () => window.location.reload(),
     );
+  }
+
+  async function handleResetDataset() {
+    const res = await fetch("http://localhost:5000/reset_dataset", {
+      method: "POST",
+      credentials: "include",
+    });
+    if (res.ok) window.location.reload();
   }
 
   return (
@@ -65,7 +73,7 @@ export default function UploadState({
           continueWithoutSnapshot(() =>
             train.startTrainToast(() => {
               onTrainingComplete?.();
-            })
+            }),
           )
         }
         onDismiss={dismissSnapshotFull}
@@ -80,9 +88,10 @@ export default function UploadState({
             onFilePicked(e.dataTransfer.files);
           }}
           className={`bg-white border-2 border-dashed rounded-2xl p-20 text-center transition-all
-            ${isUploading
-              ? "border-teal-300 bg-teal-50 cursor-wait"
-              : "border-gray-300 cursor-pointer hover:border-teal-500 hover:bg-teal-50"
+            ${
+              isUploading
+                ? "border-teal-300 bg-teal-50 cursor-wait"
+                : "border-gray-300 cursor-pointer hover:border-teal-500 hover:bg-teal-50"
             }`}
         >
           <input
@@ -102,8 +111,11 @@ export default function UploadState({
               >
                 <circle
                   className="opacity-25"
-                  cx="12" cy="12" r="10"
-                  stroke="currentColor" strokeWidth="4"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
                 />
                 <path
                   className="opacity-75"
@@ -116,14 +128,27 @@ export default function UploadState({
           ) : (
             <>
               <p className="text-gray-700 font-medium">Upload Dataset CSV</p>
-              <p className="text-sm text-gray-500 mt-2">Drag & drop atau klik upload</p>
+              <p className="text-sm text-gray-500 mt-2">
+                Drag & drop atau klik upload
+              </p>
             </>
           )}
 
           {datasetName && !isUploading && (
-            <p className="text-xs text-teal-600 mt-3 font-medium">
-              Dataset Aktif: {datasetName}
-            </p>
+            <div className="flex items-center justify-center gap-2 mt-3">
+              <p className="text-xs text-teal-600 font-medium">
+                Dataset Aktif: {datasetName}
+              </p>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleResetDataset();
+                }}
+                className="text-xs text-red-400 hover:text-red-600 underline transition-colors cursor-pointer"
+              >
+                Reset
+              </button>
+            </div>
           )}
 
           {fileName && !isUploading && (

@@ -5,7 +5,6 @@ import { useState, useEffect } from 'react';
 import {
   User,
   ResourceLimit,
-  UserResourceLimit,
   UsageLog,
   DashboardStats
 } from '@/app/types/admin.types';
@@ -17,66 +16,12 @@ import {
 
 import { PYTHON_API_URL } from '@/app/lib/api';
 
-const getSampleUsageLogs = (): UsageLog[] => {
-  const logs: UsageLog[] = [];
-  const users = ['Administrator', 'kakang_kukung', 'joko_wind'];
-  const features = [
-    { id: 'forecast', name: 'Forecasting / Prediksi' },
-    { id: 'analitik', name: 'Report Analytics' },
-    { id: 'trends', name: 'Trends Reports' },
-    { id: 'export', name: 'Export Data' },
-  ];
-  const locations = ['Jakarta', 'Bawean', 'Surabaya', 'Bandung', 'Semarang'];
-  let id = 1;
-
-  const now = new Date();
-  const dayOfWeek = now.getDay();
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - ((dayOfWeek + 6) % 7));
-  monday.setHours(0, 0, 0, 0);
-
-  const dailyCounts = [3, 5, 2, 7, 4, 6, 1];
-
-  for (let d = 0; d < 7; d++) {
-    const date = new Date(monday);
-    date.setDate(monday.getDate() + d);
-    const count = dailyCounts[d];
-
-    for (let i = 0; i < count; i++) {
-      const hour = 7 + Math.floor(Math.random() * 12);
-      const minute = Math.floor(Math.random() * 60);
-      date.setHours(hour, minute, 0, 0);
-
-      const user = users[Math.floor(Math.random() * users.length)];
-      const feature = features[Math.floor(Math.random() * features.length)];
-      const location = locations[Math.floor(Math.random() * locations.length)];
-
-      logs.push({
-        id: String(id++),
-        userId: String((users.indexOf(user) + 1)),
-        username: user,
-        featureId: feature.id,
-        featureName: feature.name,
-        location,
-        timestamp: date.toISOString(),
-      });
-    }
-  }
-
-  return logs.sort((a, b) =>
-    new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-  );
-};
-
 export const useAdminData = () => {
 
   const [users, setUsers] = useState<User[]>([]);
 
   const [resourceLimits, setResourceLimits] =
     useState<ResourceLimit[]>(DEFAULT_RESOURCE_LIMITS);
-
-  const [userResourceLimits, setUserResourceLimits] =
-    useState<UserResourceLimit[]>([]);
 
   const [usageLogs, setUsageLogs] =
     useState<UsageLog[]>([]);
@@ -105,7 +50,8 @@ useEffect(() => {
     try {
 
       const res = await fetch(
-        `${PYTHON_API_URL}/users`
+        `${PYTHON_API_URL}/users`,
+        { credentials: 'include' }
       );
 
       const data = await res.json();
@@ -152,7 +98,8 @@ useEffect(() => {
   const fetchLoginCount = async () => {
     try {
       const res = await fetch(
-        `${PYTHON_API_URL}/login-count`
+        `${PYTHON_API_URL}/login-count`,
+        { credentials: 'include' }
       );
       const data = await res.json();
       setLoginCountToday(data.count);
@@ -184,17 +131,6 @@ useEffect(() => {
       );
     }
 
-    const storedUserLimits =
-      localStorage.getItem(
-        'ventara-user-resource-limits'
-      );
-
-    if (storedUserLimits) {
-      setUserResourceLimits(
-        JSON.parse(storedUserLimits)
-      );
-    }
-
     const storedLogs =
       localStorage.getItem(
         'ventara-usage-logs'
@@ -207,10 +143,10 @@ useEffect(() => {
       );
 
     } else {
-      setUsageLogs(getSampleUsageLogs());
+      setUsageLogs([]);
     }
 
-  }, [users]);
+  }, []);
 
   // =========================
   // DASHBOARD STATS
@@ -334,147 +270,40 @@ const updateResourceLimit = (
 
 };
 
-const updateUserResourceLimit = (
-  userId: string,
-  featureId: string,
-  _field: string,
-  value: number
-) => {
-
-  const existing =
-    userResourceLimits.find(
-      x =>
-        x.userId === userId &&
-        x.id === featureId
-    );
-
-  const base =
-    existing ??
-    {
-      ...resourceLimits.find(
-        r => r.id === featureId
-      )!,
-
-      userId,
-
-      username:
-        users.find(
-          u => u.id === userId
-        )?.username || ""
-
-    };
-
-  const updatedItem = { ...base, maxStorageMb: value };
-
-  const updated = [
-
-    ...userResourceLimits.filter(
-      x =>
-        !(
-          x.userId === userId &&
-          x.id === featureId
-        )
-    ),
-
-    updatedItem
-
-  ];
-
-  setUserResourceLimits(updated);
-
-  localStorage.setItem(
-    "ventara-user-resource-limits",
-    JSON.stringify(updated)
-  );
-
-  // Save to Flask server
-  const username = users.find(u => u.id === userId)?.username;
-  if (username) {
-    fetch(`${PYTHON_API_URL}/user-data/${username}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        resourceLimits: Object.fromEntries(
-          updated
-            .filter(x => x.userId === userId)
-            .map(x => [x.id, {
-              featureName: x.featureName,
-              description: x.description,
-              maxStorageMb: x.maxStorageMb,
-            }])
-        ),
-      }),
-    }).catch(_ => {});
-  }
-
-};
-
-const getUserLimit = (
-  userId: string,
-  featureId: string
-): { maxStorageMb: number } => {
-
-  const custom =
-    userResourceLimits.find(
-      x =>
-        x.userId === userId &&
-        x.id === featureId
-    );
-
-  if (custom) {
-    return { maxStorageMb: custom.maxStorageMb };
-  }
-
-  const def =
-    resourceLimits.find(
-      x => x.id === featureId
-    );
-
-  return { maxStorageMb: def?.maxStorageMb ?? 10 };
-
-};
-
 const getUserUsageToday = (
-  userId: string
+  username: string
 ) => {
 
   const today = getTodayKey();
 
   return usageLogs.filter(
     log =>
-      log.userId === userId &&
+      log.username === username &&
       log.timestamp.startsWith(today)
   ).length;
 
 };
 
-const deleteUser = (
-  userId: string
-) => {
-
-  setUsers(prev =>
-    prev.filter(
-      u => u.id !== userId
-    )
-  );
-
-};
-
 const activateUser = async (
-  userId: string,
+  username: string,
   active: boolean = true
 ) => {
-  const username = users.find(u => u.id === userId)?.username;
-  if (!username) return;
   try {
-    await fetch(`${PYTHON_API_URL}/user-data/${username}`, {
+    const res = await fetch(`${PYTHON_API_URL}/user-data/${username}`, {
       method: 'PUT',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isActive: active }),
     });
+
+    if (!res.ok) {
+      console.error('Failed to update user status: server menolak request');
+      return;
+    }
+
     setUsers(prev =>
       prev.map(u =>
-        u.id === userId ? { ...u, isActive: active } : u
+        u.username === username ? { ...u, isActive: active } : u
       )
     );
   } catch (err) {
@@ -482,20 +311,11 @@ const activateUser = async (
   }
 };
 
-const fetchUserData = async (username: string): Promise<{ resourceLimits?: Record<string, { maxStorageMb: number }>; history?: any[]; storageLimitMb?: number } | null> => {
-  try {
-    const res = await fetch(`${PYTHON_API_URL}/user-data/${username}`);
-    if (!res.ok) return null;
-    return await res.json();
-  } catch (_) {
-    return null;
-  }
-};
-
 const updateUserStorageLimit = async (username: string, mb: number): Promise<boolean> => {
   try {
     const res = await fetch(`${PYTHON_API_URL}/user-data/${username}`, {
       method: 'PUT',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ storageLimitMb: mb }),
     });
@@ -511,22 +331,15 @@ const updateUserStorageLimit = async (username: string, mb: number): Promise<boo
   setUsers,
 
   resourceLimits,
-  userResourceLimits,
-  setUserResourceLimits,
 
   usageLogs,
   dashboardStats,
 
   updateResourceLimit,
-  updateUserResourceLimit,
   updateUserStorageLimit,
 
-  getUserLimit,
   getUserUsageToday,
 
-  deleteUser,
   activateUser,
-
-  fetchUserData,
 };
 };

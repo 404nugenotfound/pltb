@@ -20,7 +20,8 @@ export default function ForecastingPage() {
   const [generateMode, setGenerateMode]   = useState<"general" | "best">("general");
   const [uiState, setUiState]             = useState<"idle" | "loading" | "nlp">("idle");
   const [nlpReport, setNlpReport]         = useState("");
-  const [ensembleSummary, setEnsembleSummary] = useState<Record<string, any>>({});  // ← tambah
+  const [ensembleSummary, setEnsembleSummary] = useState<Record<string, any>>({});
+  const [generatedKey, setGeneratedKey]   = useState<string>(""); // ← tambah: kombinasi mode+var terakhir yg sukses generate
 
   const { dataset_name, metrics, best_models = [], stacking_metrics = {}, refreshMetrics } = useMetrics(selectedVars);
   const { generate, startGenerate } = useGenerateContext();
@@ -38,6 +39,7 @@ export default function ForecastingPage() {
     const savedReport = sessionStorage.getItem(`ventara_nlp_report_${username}`);
     const savedMode   = sessionStorage.getItem(`ventara_generate_mode_${username}`);
     const savedEnsemble = sessionStorage.getItem(`ventara_ensemble_summary_${username}`);
+    const savedKey    = sessionStorage.getItem(`ventara_generated_key_${username}`); // ← tambah
 
     if (savedState)   setUiState(savedState);
     if (savedReport)  setNlpReport(savedReport);
@@ -46,7 +48,42 @@ export default function ForecastingPage() {
       setSelectedModel(savedMode);   // ← tambah ini
     }
     if (savedEnsemble) setEnsembleSummary(JSON.parse(savedEnsemble));
+    if (savedKey) setGeneratedKey(savedKey); // ← tambah
   }, []);
+
+  // Kombinasi mode + variabel yang sedang dipilih sekarang
+  const currentKey = selectedModel === "best" ? "best" : `general-${selectedVars}`;
+  // Tombol disable kalau kombinasi yang dipilih sekarang sama dengan yang barusan sukses di-generate
+  const isAlreadyGenerated = uiState === "nlp" && generatedKey === currentKey;
+  // Sekalian cegah double-click pas proses generate masih jalan
+  const isGenerateDisabled = isAlreadyGenerated || generate.visible;
+
+  function handleGenerateClick() {
+    startGenerate(
+      selectedModel,
+      async (nlpReport: string, ensembleSummary: Record<string, any>) => {
+        const username = sessionStorage.getItem("ventara_username");
+        const key = selectedModel === "best" ? "best" : `general-${selectedVars}`; // ← tambah
+
+        setGenerateMode(selectedModel as "general" | "best");
+        setUiState("nlp");
+        setNlpReport(nlpReport);
+        setGeneratedKey(key); // ← tambah
+
+        sessionStorage.setItem(`ventara_ui_state_${username}`, "nlp");
+        sessionStorage.setItem(`ventara_nlp_report_${username}`, nlpReport);
+        sessionStorage.setItem(`ventara_generate_mode_${username}`, selectedModel === "best" ? "best" : "general");
+        sessionStorage.setItem(`ventara_generated_key_${username}`, key); // ← tambah
+
+        // Simpan dan set ensemble summary
+        if (Object.keys(ensembleSummary).length > 0) {
+          setEnsembleSummary(ensembleSummary);
+          sessionStorage.setItem(`ventara_ensemble_summary_${username}`, JSON.stringify(ensembleSummary));
+        }
+      },
+      selectedVars
+    );
+  }
 
   return (
     <div className="flex h-screen">
@@ -98,10 +135,12 @@ export default function ForecastingPage() {
                   const username = sessionStorage.getItem("ventara_username");
                   setUiState("idle");
                   setNlpReport("");
-                  setEnsembleSummary({});  // ← reset
+                  setEnsembleSummary({});
+                  setGeneratedKey(""); // ← tambah: reset juga kunci tombol
                   sessionStorage.removeItem(`ventara_ui_state_${username}`);
                   sessionStorage.removeItem(`ventara_nlp_report_${username}`);
-                  sessionStorage.removeItem(`ventara_ensemble_summary_${username}`);  // ← clear
+                  sessionStorage.removeItem(`ventara_ensemble_summary_${username}`);
+                  sessionStorage.removeItem(`ventara_generated_key_${username}`); // ← tambah
                 }}
                 onTrainingComplete={refreshMetrics}
               />
@@ -188,42 +227,26 @@ export default function ForecastingPage() {
                 bestModels={best_models}
                 selectedVar={selectedVars} 
                 stackingMetrics={stacking_metrics}
-                ensembleSummary={ensembleSummary}  // ← tambah
+                ensembleSummary={ensembleSummary}
               />
 
               {/* BUTTON */}
               <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
                 <button
-                  onClick={() =>
-                    startGenerate(
-                      selectedModel,
-                      async (nlpReport: string, ensembleSummary: Record<string, any>) => {
-                        const username = sessionStorage.getItem("ventara_username");
-
-                        setGenerateMode(selectedModel as "general" | "best");
-                        setUiState("nlp");
-                        setNlpReport(nlpReport);
-
-                        sessionStorage.setItem(`ventara_ui_state_${username}`, "nlp");
-                        sessionStorage.setItem(`ventara_nlp_report_${username}`, nlpReport);
-                        sessionStorage.setItem(`ventara_generate_mode_${username}`, selectedModel === "best" ? "best" : "general");
-
-                        // Simpan dan set ensemble summary
-                        if (Object.keys(ensembleSummary).length > 0) {
-                          setEnsembleSummary(ensembleSummary);  // ← set state
-                          sessionStorage.setItem(`ventara_ensemble_summary_${username}`, JSON.stringify(ensembleSummary));
-                        }
-                      },
-                      selectedVars
-                    )
-                  }
-                  className="flex items-center gap-2 px-5 py-2.5 bg-teal-500 text-white font-medium rounded-xl text-sm hover:bg-teal-600 transition-colors"
+                  disabled={isGenerateDisabled}
+                  onClick={handleGenerateClick}
+                  title={isAlreadyGenerated ? "Sudah pernah generate kombinasi ini — ganti mode/variabel atau klik Reset dulu" : undefined}
+                  className={`flex items-center gap-2 px-5 py-2.5 font-medium rounded-xl text-sm transition-colors ${
+                    isGenerateDisabled
+                      ? "bg-gray-200 text-gray-400 cursor-not-allowed"
+                      : "bg-teal-500 text-white hover:bg-teal-600 cursor-pointer"
+                  }`}
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2"
                       d="M13 10V3L4 14h7v7l9-11h-7z" />
                   </svg>
-                  Generate Full CSV
+                  {isAlreadyGenerated ? "Sudah Di-generate" : "Generate Full CSV"}
                 </button>
               </div>
             </div>

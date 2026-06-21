@@ -1,85 +1,66 @@
+import os
 import numpy as np
 from config import *
 from training.feature_engineering import load_and_engineer
 from training.load_ml import init_ml_state
 from training.load_dl import init_dl_models
+from training.metrics import load_metrics_for_var, load_dl_metrics_for_var
 from utils.cache import load_or_compute_metrics
+from utils.registry import compute_file_hash
+
+ALL_VARS = ["WS10M", "WD10M", "T2M", "RH2M", "PS"]
 
 
-def reload_all_globals(dataset_path, username: str = ""):  # ← tambah username
-    # ✅ target_var=TARGET eksplisit
-    df = load_and_engineer(dataset_path, target_var=TARGET)
+def reload_all_globals(dataset_path, username: str = "", registry: dict = None):
+    df_target = load_and_engineer(dataset_path, target_var=TARGET)
+    file_hash = compute_file_hash(dataset_path) if dataset_path and os.path.exists(dataset_path) else ""
 
-    # =========================
-    # INIT ML
-    # =========================
-    ml_state = init_ml_state(
-        df,
-        username=username
-    )
+    ml_state = init_ml_state(df_target, username=username)
 
-    # =========================
-    # INIT DL
-    # =========================
-    dl_state = init_dl_models(
-        df,
-        target_var=TARGET,
-        username=username
-    )
+    dl_states = {}
+    for var in ALL_VARS:
+        df_var = load_and_engineer(dataset_path, target_var=var)
+        dl_states[var] = init_dl_models(df_var, target_var=var, username=username)
 
-    # ✅ var_name=TARGET eksplisit
-    metrics_ml, metrics_dl = load_or_compute_metrics(
-        ml_state["ML_READY"],
-        dl_state["DL_READY"],
-        ml_state["gbr"],
-        ml_state["xgb"],
-        ml_state["knn"],
-        ml_state["scaler"],
-        ml_state["X"],
-        ml_state["y"],
-        dl_state["X_scaled"],
-        dl_state["scaler_y"],
-        dl_state["lstm"],
-        dl_state["bilstm"],
-        var_name=TARGET,
-        username=username,  # ← pakai parameter, bukan session
-    )
+    all_metrics_ml = {}
+    all_metrics_dl = {}
 
-    # ✅ Update app globals — tanpa ini reload tidak efek apapun
-    import app as _app
+    if registry and registry.get("metrics"):
+        for var in ALL_VARS:
+            all_metrics_ml[var] = load_metrics_for_var(var, file_hash="", username=username)
+            all_metrics_dl[var] = load_dl_metrics_for_var(var, file_hash="", username=username)
+        print(f"♻️ Metrics direstore dari snapshot registry (skip recompute) — user={username}")
+    else:
+        # Training baru / nggak ada snapshot — compute seperti biasa
+        for var in ALL_VARS:
+            dl = dl_states[var]
+            ml, dl_met = load_or_compute_metrics(
+                ml_state["ML_READY"], dl["DL_READY"],
+                ml_state["gbr"], ml_state["xgb"], ml_state["knn"], ml_state["scaler"],
+                ml_state["X"], ml_state["y"],
+                dl["X_scaled"], dl["scaler_y"],
+                ml_state["lstm"] if hasattr(ml_state, "lstm") else dl["lstm"], dl["bilstm"],
+                var_name=var, file_hash=file_hash, username=username,
+            )
+            all_metrics_ml[var] = ml
+            all_metrics_dl[var] = dl_met
 
-    _app.df = df
-    _app.gbr = ml_state["gbr"]
-    _app.xgb = ml_state["xgb"]
-    _app.knn = ml_state["knn"]
-    _app.scaler = ml_state["scaler"]
-    _app.FEATURES = ml_state["FEATURES"]
-    _app.ML_READY = ml_state["ML_READY"]
-    _app.X = ml_state["X"]
-    _app.y = ml_state["y"]
-    _app.data_ml = ml_state["data_ml"]
-    _app.lstm = dl_state["lstm"]
-    _app.bilstm = dl_state["bilstm"]
-    _app.scaler_X = dl_state["scaler_X"]
-    _app.scaler_y = dl_state["scaler_y"]
-    _app.X_scaled = dl_state["X_scaled"]
-    _app.data_seq = dl_state["data_seq"]
-    _app.DL_INPUT_COLS = dl_state["DL_INPUT_COLS"]
-    _app.DL_READY = dl_state["DL_READY"]
-    _app.is_circular = dl_state.get("is_circular", False)  # ← tambah ini
-    _app.metrics = metrics_ml
-    _app.metrics_dl = metrics_dl
+    dl_target = dl_states[TARGET]
 
     print(
         f"♻️ Globals reloaded — "
-        f"ML: {list(metrics_ml.keys())} | "
-        f"DL: {list(metrics_dl.keys())}"
+        f"ML: {list(all_metrics_ml[TARGET].keys())} | "
+        f"DL: {list(all_metrics_dl[TARGET].keys())}"
     )
 
     return {
-        "df": df,
+        "df": df_target,
         "ml_state": ml_state,
-        "dl_state": dl_state,
-        "metrics_ml": metrics_ml,
-        "metrics_dl": metrics_dl,
+        "dl_state": dl_target,
+        "metrics_ml": all_metrics_ml[TARGET],
+        "metrics_dl": all_metrics_dl[TARGET],
     }
+
+
+def clear_user_state(username: str):
+    pass

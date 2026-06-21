@@ -9,13 +9,9 @@ def user_path(username: str) -> str:
 
 def load_user(username: str) -> dict | None:
     path = user_path(username)
-    print(f"🔍 LOAD_USER path={os.path.abspath(path)}")
     if os.path.exists(path):
         with open(path, "r") as f:
-            data = json.load(f)
-            ids = [h.get("entry", h).get("id") for h in data.get("history", [])]
-            print(f"🔍 LOAD_USER ids={ids}")
-            return data
+            return json.load(f)
     return None
 
 
@@ -24,3 +20,16 @@ def save_user(user: dict) -> None:
     path = user_path(user["username"])
     with open(path, "w") as f:
         json.dump(user, f, indent=2)
+
+
+def list_all_usernames() -> list[str]:
+    """List semua username yang punya file JSON di USER_FOLDER.
+    Folder model per-user (misal users/kangkungkang/) DIABAIKAN — cuma file .json yang diambil.
+    """
+    if not os.path.exists(USER_FOLDER):
+        return []
+    return [
+        f[:-5]  # strip ".json"
+        for f in os.listdir(USER_FOLDER)
+        if f.endswith(".json") and os.path.isfile(os.path.join(USER_FOLDER, f))
+    ]

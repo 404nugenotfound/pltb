@@ -7,17 +7,15 @@ interface UsersTabProps {
   users: User[];
   searchQuery: string;
   onSearchChange: (query: string) => void;
-  onEditUser: (user: User) => void;
-  onDeactivateUser: (userId: string) => void;
-  onActivateUser: (userId: string) => void;
-  getUserUsageToday: (userId: string) => number;
+  onDeactivateUser: (username: string) => void;
+  onActivateUser: (username: string) => void;
+  getUserUsageToday: (username: string) => number;
 }
 
 export const UsersTab = ({
   users,
   searchQuery,
   onSearchChange,
-  onEditUser,
   onDeactivateUser,
   onActivateUser,
   getUserUsageToday,
@@ -75,7 +73,7 @@ export const UsersTab = ({
                 </tr>
               ) : (
                 filteredUsers.map((user) => (
-                  <tr key={user.id} className="border-b border-gray-50 hover:bg-linear-to-r hover:from-[#e6f6f4]/30 hover:to-transparent transition-all duration-300 group/row">
+                  <tr key={user.username} className="border-b border-gray-50 hover:bg-linear-to-r hover:from-[#e6f6f4]/30 hover:to-transparent transition-all duration-300 group/row">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold ${
@@ -94,7 +92,7 @@ export const UsersTab = ({
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                         <span className="text-sm font-semibold text-[#00a991]">{user.usageCount} kali</span>
-                        <span className="text-xs text-gray-400">Hari ini: {getUserUsageToday(user.id)}</span>
+                        <span className="text-xs text-gray-400">Hari ini: {getUserUsageToday(user.username)}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -109,30 +107,21 @@ export const UsersTab = ({
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        {user.isActive && (
-                          <button
-                            onClick={() => onEditUser(user)}
-                            className="text-gray-400 hover:text-[#00a991] transition-all px-3 py-1.5 rounded-lg hover:bg-[#e6f6f4]"
-                            title="Edit Batas Penggunaan"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                        )}
                         {user.isActive ? (
                           <button
-                            onClick={() => onDeactivateUser(user.id)}
+                            onClick={() => onDeactivateUser(user.username)}
                             className="text-gray-400 hover:text-red-500 transition-all px-3 py-1.5 rounded-lg hover:bg-red-50"
                             title="Nonaktifkan Pengguna"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              <circle cx="12" cy="12" r="9" strokeWidth="2" />
+                              <line x1="10" y1="9" x2="10" y2="15" strokeWidth="2" strokeLinecap="round" />
+                              <line x1="14" y1="9" x2="14" y2="15" strokeWidth="2" strokeLinecap="round" />
                             </svg>
                           </button>
                         ) : (
                           <button
-                            onClick={() => onActivateUser(user.id)}
+                            onClick={() => onActivateUser(user.username)}
                             className="text-gray-400 hover:text-[#00a991] transition-all px-3 py-1.5 rounded-lg hover:bg-[#e6f6f4]"
                             title="Aktifkan Pengguna"
                           >

@@ -1,0 +1,498 @@
+{
+  "id": "snap_53b06f80_1782018707",
+  "dataset": "NASA_Sukabumi_Hourly.csv",
+  "hash": "53b06f808d69f3ff16fb562e9ad2c7e1",
+  "trained_at": "2026-06-21T18:36:05.764555",
+  "metrics": {
+    "WS10M": {
+      "ml": {
+        "GBR": {
+          "train": {
+            "MAE": 0.153,
+            "RMSE": 0.203,
+            "R2": 0.983,
+            "sMAPE": 5.64,
+            "primary_metric": "sMAPE",
+            "primary_value": 5.64
+          },
+          "test": {
+            "MAE": 0.147,
+            "RMSE": 0.196,
+            "R2": 0.983,
+            "sMAPE": 6.03,
+            "primary_metric": "sMAPE",
+            "primary_value": 6.03
+          }
+        },
+        "XGB": {
+          "train": {
+            "MAE": 0.091,
+            "RMSE": 0.123,
+            "R2": 0.994,
+            "sMAPE": 3.43,
+            "primary_metric": "sMAPE",
+            "primary_value": 3.43
+          },
+          "test": {
+            "MAE": 0.09,
+            "RMSE": 0.121,
+            "R2": 0.994,
+            "sMAPE": 3.71,
+            "primary_metric": "sMAPE",
+            "primary_value": 3.71
+          }
+        },
+        "KNN": {
+          "train": {
+            "MAE": 0.293,
+            "RMSE": 0.378,
+            "R2": 0.94,
+            "sMAPE": 10.42,
+            "primary_metric": "sMAPE",
+            "primary_value": 10.42
+          },
+          "test": {
+            "MAE": 0.355,
+            "RMSE": 0.462,
+            "R2": 0.906,
+            "sMAPE": 13.57,
+            "primary_metric": "sMAPE",
+            "primary_value": 13.57
+          }
+        }
+      },
+      "dl": {
+        "LSTM": {
+          "train": {
+            "MAE": 0.194,
+            "RMSE": 0.257,
+            "R2": 0.972,
+            "sMAPE": 6.88,
+            "primary_metric": "sMAPE",
+            "primary_value": 6.88
+          },
+          "test": {
+            "MAE": 0.18,
+            "RMSE": 0.241,
+            "R2": 0.975,
+            "sMAPE": 7.13,
+            "primary_metric": "sMAPE",
+            "primary_value": 7.13
+          }
+        },
+        "BiLSTM": {
+          "train": {
+            "MAE": 0.219,
+            "RMSE": 0.289,
+            "R2": 0.965,
+            "sMAPE": 7.81,
+            "primary_metric": "sMAPE",
+            "primary_value": 7.81
+          },
+          "test": {
+            "MAE": 0.207,
+            "RMSE": 0.274,
+            "R2": 0.967,
+            "sMAPE": 8.05,
+            "primary_metric": "sMAPE",
+            "primary_value": 8.05
+          }
+        }
+      }
+    },
+    "WD10M": {
+      "ml": {
+        "GBR": {
+          "train": {
+            "CircularMAE": 1.141,
+            "CircularRMSE": 2.319,
+            "CircularCorr": 0.999,
+            "Acc15": 99.69,
+            "primary_metric": "CircularMAE",
+            "primary_value": 1.141
+          },
+          "test": {
+            "CircularMAE": 1.346,
+            "CircularRMSE": 2.466,
+            "CircularCorr": 0.999,
+            "Acc15": 99.77,
+            "primary_metric": "CircularMAE",
+            "primary_value": 1.346
+          }
+        },
+        "XGB": {
+          "train": {
+            "CircularMAE": 0.654,
+            "CircularRMSE": 1.674,
+            "CircularCorr": 1.0,
+            "Acc15": 99.89,
+            "primary_metric": "CircularMAE",
+            "primary_value": 0.654
+          },
+          "test": {
+            "CircularMAE": 0.76,
+            "CircularRMSE": 2.07,
+            "CircularCorr": 0.999,
+            "Acc15": 99.84,
+            "primary_metric": "CircularMAE",
+            "primary_value": 0.76
+          }
+        },
+        "KNN": {
+          "train": {
+            "CircularMAE": 5.634,
+            "CircularRMSE": 11.742,
+            "CircularCorr": 0.984,
+            "Acc15": 95.6,
+            "primary_metric": "CircularMAE",
+            "primary_value": 5.634
+          },
+          "test": {
+            "CircularMAE": 7.709,
+            "CircularRMSE": 12.675,
+            "CircularCorr": 0.98,
+            "Acc15": 89.22,
+            "primary_metric": "CircularMAE",
+            "primary_value": 7.709
+          }
+        }
+      },
+      "dl": {
+        "LSTM": {
+          "train": {
+            "CircularMAE": 2.655,
+            "CircularRMSE": 6.803,
+            "CircularCorr": 0.994,
+            "Acc15": 98.31,
+            "primary_metric": "CircularMAE",
+            "primary_value": 2.655
+          },
+          "test": {
+            "CircularMAE": 2.814,
+            "CircularRMSE": 6.884,
+            "CircularCorr": 0.994,
+            "Acc15": 98.09,
+            "primary_metric": "CircularMAE",
+            "primary_value": 2.814
+          }
+        },
+        "BiLSTM": {
+          "train": {
+            "CircularMAE": 3.176,
+            "CircularRMSE": 7.311,
+            "CircularCorr": 0.993,
+            "Acc15": 97.96,
+            "primary_metric": "CircularMAE",
+            "primary_value": 3.176
+          },
+          "test": {
+            "CircularMAE": 3.398,
+            "CircularRMSE": 7.43,
+            "CircularCorr": 0.993,
+            "Acc15": 97.72,
+            "primary_metric": "CircularMAE",
+            "primary_value": 3.398
+          }
+        }
+      }
+    },
+    "RH2M": {
+      "ml": {
+        "GBR": {
+          "train": {
+            "MAE": 0.614,
+            "RMSE": 0.851,
+            "R2": 0.989,
+            "sMAPE": 0.75,
+            "MAE_pct": 0.61,
+            "primary_metric": "MAE",
+            "primary_value": 0.61
+          },
+          "test": {
+            "MAE": 0.555,
+            "RMSE": 0.774,
+            "R2": 0.986,
+            "sMAPE": 0.67,
+            "MAE_pct": 0.56,
+            "primary_metric": "MAE",
+            "primary_value": 0.56
+          }
+        },
+        "XGB": {
+          "train": {
+            "MAE": 0.413,
+            "RMSE": 0.569,
+            "R2": 0.995,
+            "sMAPE": 0.51,
+            "MAE_pct": 0.41,
+            "primary_metric": "MAE",
+            "primary_value": 0.41
+          },
+          "test": {
+            "MAE": 0.408,
+            "RMSE": 0.569,
+            "R2": 0.993,
+            "sMAPE": 0.49,
+            "MAE_pct": 0.41,
+            "primary_metric": "MAE",
+            "primary_value": 0.41
+          }
+        },
+        "KNN": {
+          "train": {
+            "MAE": 1.012,
+            "RMSE": 1.342,
+            "R2": 0.972,
+            "sMAPE": 1.23,
+            "MAE_pct": 1.01,
+            "primary_metric": "MAE",
+            "primary_value": 1.01
+          },
+          "test": {
+            "MAE": 1.25,
+            "RMSE": 1.652,
+            "R2": 0.937,
+            "sMAPE": 1.49,
+            "MAE_pct": 1.25,
+            "primary_metric": "MAE",
+            "primary_value": 1.25
+          }
+        }
+      },
+      "dl": {
+        "LSTM": {
+          "train": {
+            "MAE": 0.973,
+            "RMSE": 1.313,
+            "R2": 0.973,
+            "sMAPE": 1.18,
+            "MAE_pct": 0.97,
+            "primary_metric": "MAE",
+            "primary_value": 0.97
+          },
+          "test": {
+            "MAE": 0.936,
+            "RMSE": 1.259,
+            "R2": 0.963,
+            "sMAPE": 1.12,
+            "MAE_pct": 0.94,
+            "primary_metric": "MAE",
+            "primary_value": 0.94
+          }
+        },
+        "BiLSTM": {
+          "train": {
+            "MAE": 1.098,
+            "RMSE": 1.464,
+            "R2": 0.967,
+            "sMAPE": 1.34,
+            "MAE_pct": 1.1,
+            "primary_metric": "MAE",
+            "primary_value": 1.1
+          },
+          "test": {
+            "MAE": 1.076,
+            "RMSE": 1.421,
+            "R2": 0.953,
+            "sMAPE": 1.29,
+            "MAE_pct": 1.08,
+            "primary_metric": "MAE",
+            "primary_value": 1.08
+          }
+        }
+      }
+    },
+    "T2M": {
+      "ml": {
+        "GBR": {
+          "train": {
+            "MAE": 0.128,
+            "RMSE": 0.17,
+            "R2": 0.99,
+            "sMAPE": 0.49,
+            "primary_metric": "sMAPE",
+            "primary_value": 0.49
+          },
+          "test": {
+            "MAE": 0.115,
+            "RMSE": 0.153,
+            "R2": 0.987,
+            "sMAPE": 0.44,
+            "primary_metric": "sMAPE",
+            "primary_value": 0.44
+          }
+        },
+        "XGB": {
+          "train": {
+            "MAE": 0.079,
+            "RMSE": 0.105,
+            "R2": 0.996,
+            "sMAPE": 0.3,
+            "primary_metric": "sMAPE",
+            "primary_value": 0.3
+          },
+          "test": {
+            "MAE": 0.075,
+            "RMSE": 0.1,
+            "R2": 0.994,
+            "sMAPE": 0.28,
+            "primary_metric": "sMAPE",
+            "primary_value": 0.28
+          }
+        },
+        "KNN": {
+          "train": {
+            "MAE": 0.185,
+            "RMSE": 0.239,
+            "R2": 0.98,
+            "sMAPE": 0.71,
+            "primary_metric": "sMAPE",
+            "primary_value": 0.71
+          },
+          "test": {
+            "MAE": 0.254,
+            "RMSE": 0.325,
+            "R2": 0.942,
+            "sMAPE": 0.98,
+            "primary_metric": "sMAPE",
+            "primary_value": 0.98
+          }
+        }
+      },
+      "dl": {
+        "LSTM": {
+          "train": {
+            "MAE": 0.251,
+            "RMSE": 0.335,
+            "R2": 0.961,
+            "sMAPE": 0.95,
+            "primary_metric": "sMAPE",
+            "primary_value": 0.95
+          },
+          "test": {
+            "MAE": 0.236,
+            "RMSE": 0.321,
+            "R2": 0.943,
+            "sMAPE": 0.9,
+            "primary_metric": "sMAPE",
+            "primary_value": 0.9
+          }
+        },
+        "BiLSTM": {
+          "train": {
+            "MAE": 0.234,
+            "RMSE": 0.306,
+            "R2": 0.968,
+            "sMAPE": 0.89,
+            "primary_metric": "sMAPE",
+            "primary_value": 0.89
+          },
+          "test": {
+            "MAE": 0.219,
+            "RMSE": 0.288,
+            "R2": 0.954,
+            "sMAPE": 0.84,
+            "primary_metric": "sMAPE",
+            "primary_value": 0.84
+          }
+        }
+      }
+    },
+    "PS": {
+      "ml": {
+        "GBR": {
+          "train": {
+            "MAE": 0.015,
+            "RMSE": 0.02,
+            "R2": 0.986,
+            "EVS": 0.986,
+            "primary_metric": "MAE",
+            "primary_value": 0.015
+          },
+          "test": {
+            "MAE": 0.016,
+            "RMSE": 0.021,
+            "R2": 0.982,
+            "EVS": 0.983,
+            "primary_metric": "MAE",
+            "primary_value": 0.016
+          }
+        },
+        "XGB": {
+          "train": {
+            "MAE": 0.009,
+            "RMSE": 0.012,
+            "R2": 0.995,
+            "EVS": 0.995,
+            "primary_metric": "MAE",
+            "primary_value": 0.009
+          },
+          "test": {
+            "MAE": 0.009,
+            "RMSE": 0.012,
+            "R2": 0.994,
+            "EVS": 0.994,
+            "primary_metric": "MAE",
+            "primary_value": 0.009
+          }
+        },
+        "KNN": {
+          "train": {
+            "MAE": 0.025,
+            "RMSE": 0.032,
+            "R2": 0.965,
+            "EVS": 0.965,
+            "primary_metric": "MAE",
+            "primary_value": 0.025
+          },
+          "test": {
+            "MAE": 0.038,
+            "RMSE": 0.05,
+            "R2": 0.9,
+            "EVS": 0.909,
+            "primary_metric": "MAE",
+            "primary_value": 0.038
+          }
+        }
+      },
+      "dl": {
+        "LSTM": {
+          "train": {
+            "MAE": 0.025,
+            "RMSE": 0.032,
+            "R2": 0.965,
+            "EVS": 0.97,
+            "primary_metric": "MAE",
+            "primary_value": 0.025
+          },
+          "test": {
+            "MAE": 0.024,
+            "RMSE": 0.031,
+            "R2": 0.962,
+            "EVS": 0.964,
+            "primary_metric": "MAE",
+            "primary_value": 0.024
+          }
+        },
+        "BiLSTM": {
+          "train": {
+            "MAE": 0.023,
+            "RMSE": 0.029,
+            "R2": 0.97,
+            "EVS": 0.971,
+            "primary_metric": "MAE",
+            "primary_value": 0.023
+          },
+          "test": {
+            "MAE": 0.024,
+            "RMSE": 0.03,
+            "R2": 0.963,
+            "EVS": 0.963,
+            "primary_metric": "MAE",
+            "primary_value": 0.024
+          }
+        }
+      }
+    }
+  }
+}

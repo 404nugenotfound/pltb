@@ -8,10 +8,7 @@ from config import *
 
 from utils.cache import *
 from utils.dataset import (
-    get_active_dataset_path,
-    set_active_dataset_path,
-    get_active_dataset_path_for_user,      # ← tambah
-    set_active_dataset_path_for_user,      # ← tambah
+    get_active_dataset_path_for_user,       # ← tambah
     allowed_file
 )
 from utils.progress import generate_progress, progress_lock
@@ -26,118 +23,13 @@ main_bp = Blueprint(
 )
 
 # =========================
-# OVERVIEW
-# =========================
-@main_bp.route(
-    "/overview",
-    methods=["GET", "POST"]
-)
-def overview():
-
-    from app import (
-        metrics,
-        metrics_dl,
-        y,
-        X,
-        ML_READY,
-        gbr,
-        xgb,
-        knn,
-        scaler
-    )
-
-    selected_model = session.get(
-        "selected_model",
-        "all"
-    )
-
-    nlp_report = session.get(
-        "nlp_report",
-        None
-    )
-
-    all_metrics = {
-        **metrics,
-        **metrics_dl
-    }
-
-    best_model_names = get_best_ml_and_dl(
-        metrics,
-        metrics_dl
-    )
-
-    all_keys = (
-        list(metrics.keys())
-        + list(metrics_dl.keys())
-    )
-
-    labels = [
-        f"{i}:00"
-        for i in range(24)
-    ]
-
-    actual_data = y[-24:].tolist()
-
-    gbr_data = (
-        gbr.predict(X[-24:]).tolist()
-        if ML_READY and gbr is not None
-        else []
-    )
-
-    xgb_data = (
-        xgb.predict(X[-24:]).tolist()
-        if ML_READY and xgb is not None
-        else []
-    )
-
-    knn_data = (
-        knn.predict(
-            scaler.transform(X[-24:])
-        ).tolist()
-
-        if ML_READY
-        and knn is not None
-        and scaler is not None
-
-        else []
-    )
-
-    return render_template(
-
-        "overview.html",
-
-        result=[],
-
-        all_metrics=all_metrics,
-
-        metrics=all_metrics,
-
-        selected_model=selected_model,
-
-        nlp_report=nlp_report,
-
-        best_model_names=best_model_names,
-
-        ordered_models=all_keys,
-
-        labels=labels,
-
-        actual_data=actual_data,
-
-        gbr_data=gbr_data,
-
-        xgb_data=xgb_data,
-
-        knn_data=knn_data
-    )
-
-# =========================
 # FORECASTING DATA
 # =========================
 @main_bp.route("/forecasting_data")
 def forecasting_data():
-    import app as _app
     from utils.user_helpers import load_user
+    from utils.dataset import get_active_dataset_path_for_user
+    from utils.registry import compute_file_hash
     from training.metrics import (
         load_metrics_for_var,
         load_dl_metrics_for_var,
@@ -147,41 +39,33 @@ def forecasting_data():
 
     username     = request.headers.get("X-Username") or session.get("username")
     selected_var = request.args.get("var", TARGET)
-    
-    print(f"🔍 forecasting_data username={username} var={selected_var}") 
 
-    all_metrics = {}
-    all_metrics.update(load_metrics_for_var(selected_var, username=username))
-    all_metrics.update(load_dl_metrics_for_var(selected_var, username=username))
-    
-    print(f"🔍 all_metrics keys={list(all_metrics.keys())}")  # ← tambah
-    print(f"🔍 XGB MAE={all_metrics.get('XGB', {}).get('MAE')}")  # ← tambah
+    # ✅ resolve file_hash dari dataset aktif user
+    dataset_path = get_active_dataset_path_for_user(username=username)
+    file_hash = compute_file_hash(dataset_path) if dataset_path and os.path.exists(dataset_path) else ""
 
-    if not all_metrics:
-        all_metrics = {
-            **_app.metrics,
-            **_app.metrics_dl
-        }
+    ml_metrics = load_metrics_for_var(selected_var, file_hash=file_hash, username=username)
+    dl_metrics = load_dl_metrics_for_var(selected_var, file_hash=file_hash, username=username)
+    all_metrics = {**ml_metrics, **dl_metrics}
 
-    best_model_names = get_best_ml_and_dl(
-        load_metrics_for_var(selected_var, username=username),
-        load_dl_metrics_for_var(selected_var, username=username)
-    )
+    # ⚠️ Fallback ke _app.metrics/_app.metrics_dl DIHAPUS DENGAN SENGAJA.
+    # Itu global state yang bisa kepunyaan user lain. Kalau metrics emang
+    # belum ada buat dataset ini, biar all_metrics kosong — FE yang handle
+    # tampilan "belum ada data, generate dulu".
+
+    best_model_names = get_best_ml_and_dl(ml_metrics, dl_metrics)  # reuse, gak query 2x
 
     dataset_name = ""
     if username:
         user = load_user(username)
         if user:
-            dataset_name = os.path.basename(
-                user.get("active_dataset", "")
-            )
+            dataset_name = os.path.basename(user.get("active_dataset", ""))
+    # Fallback ke dataset_path (DEFAULT_DATASET) DIHAPUS — kalau active_dataset
+    # kosong, itu artinya user belum punya dataset aktif, dataset_name harus
+    # tetap kosong supaya FE bisa nampilin "belum ada dataset, upload dulu"
+    # alih-alih diam-diam nampilin nama file template.
 
-    if not dataset_name:
-        dataset_name = os.path.basename(
-            get_active_dataset_path() or ""
-        )
-
-    ensemble_components = load_ensemble_components(username=username)
+    ensemble_components = load_ensemble_components(file_hash=file_hash, username=username)
     ensemble_summary = {}
     for var, components in ensemble_components.items():
         if len(components) >= 2:
@@ -261,42 +145,28 @@ def reset_nlp():
 # =========================
 # RESET DATASET
 # =========================
-@main_bp.route(
-    "/reset_dataset",
-    methods=["POST"]
-)
+@main_bp.route("/reset_dataset", methods=["POST"])
 def reset_dataset():
+    from utils.reload_state import clear_user_state
+    from utils.dataset import reset_dataset_for_user
 
-    from app import (
-        metrics,
-        metrics_dl
-    )
+    username = request.headers.get("X-Username") or session.get("username")
+    if not username:
+        return jsonify({"error": "Not logged in"}), 401
 
-    if os.path.exists(
-        ACTIVE_DATASET_FILE
-    ):
+    result = reset_dataset_for_user(username)
 
-        os.remove(
-            ACTIVE_DATASET_FILE
-        )
+    # Buang state in-memory user ini dari cache, biar /overview dkk reload fresh
+    clear_user_state(username)
 
-    session.pop(
-        "nlp_report",
-        None
-    )
-
-    session.pop(
-        "last_generate_mode",
-        None
-    )
-
+    session.pop("nlp_report", None)
+    session.pop("last_generate_mode", None)
     session.modified = True
 
-    metrics.clear()
-    metrics_dl.clear()
-
     return jsonify({
-        "status": "ok"
+        "status": "ok" if result["success"] else "error",
+        "message": result["message"],
+        "file_deleted": result.get("file_deleted", False),
     })
     
 # =========================
@@ -305,24 +175,26 @@ def reset_dataset():
 @main_bp.route("/overfit_metrics")
 def overfit_metrics():
     from training.metrics import load_metrics, load_ensemble_metrics, load_ensemble_components
+    from utils.dataset import get_active_dataset_path_for_user
+    from utils.registry import compute_file_hash
     from config import TRAIN_VARS
 
     username = request.headers.get("X-Username") or session.get("username")
 
+    dataset_path = get_active_dataset_path_for_user(username=username)
+    file_hash = compute_file_hash(dataset_path) if dataset_path and os.path.exists(dataset_path) else ""
+
     result = {}
 
     for var in TRAIN_VARS:
-        ml, dl = load_metrics(var, username=username)
-        ensemble = load_ensemble_metrics(var, username=username)
+        ml, dl = load_metrics(var, file_hash=file_hash, username=username)
+        ensemble = load_ensemble_metrics(var, file_hash=file_hash, username=username)
         combined = {**(ml or {}), **(dl or {}), **(ensemble or {})}
 
         var_result = {}
         for model, val in combined.items():
             if isinstance(val, dict) and "train" in val and "test" in val:
-                var_result[model] = {
-                    "train": val["train"],
-                    "test":  val["test"]
-                }
+                var_result[model] = {"train": val["train"], "test": val["test"]}
 
         if var_result:
             result[var] = var_result
@@ -330,7 +202,7 @@ def overfit_metrics():
     if not result:
         return jsonify({"error": "Metrics belum tersedia. Silakan train model dulu."}), 404
 
-    ensemble_components = load_ensemble_components(username=username)
+    ensemble_components = load_ensemble_components(file_hash=file_hash, username=username)
 
     return jsonify({
         "metrics":             result,
@@ -343,8 +215,10 @@ def overfit_metrics():
 @main_bp.route("/eda_summary")
 def eda_summary():
     try:
-        path = get_active_dataset_path_for_user()
+        username = request.headers.get("X-Username") or session.get("username")
+        path = get_active_dataset_path_for_user(username=username)
         df = pd.read_csv(path)
+        ...  # sisanya sama
 
         target_cols = [c for c in ["RH2M", "WS10M", "WD10M", "T2M", "PS"] if c in df.columns]
 
@@ -392,11 +266,9 @@ def eda_summary():
 @main_bp.route("/forecast_result")
 def forecast_result():
     try:
-        username = session.get("username")
+        username = request.headers.get("X-Username") or session.get("username")
         mode     = request.args.get("mode", "general")
         var      = request.args.get("var", "WS10M")
-        
-        print(f"[DEBUG] username={username}, mode={mode}, filepath akan dicari={os.path.join(OUTPUT_FOLDER, f'{username}_hasil_prediksi_{mode}.csv')}")
 
         filename = (
             f"{username}_hasil_prediksi_best.csv"

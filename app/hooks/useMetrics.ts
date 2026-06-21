@@ -44,25 +44,32 @@ export function useMetrics(selectedVar: string = "WS10M") {
   });
   const [loading, setLoading] = useState(true);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const username = sessionStorage.getItem("ventara_username") || "";
-      const res = await fetch(
-        `http://localhost:5000/forecasting_data?var=${selectedVar}`,
-        {
-          credentials: "include",
-          headers: { "X-Username": username },
-        }
-      );
-      const json = await res.json();
-      if (json.error || !json.metrics) return;
-      setData(json);
-    } catch (e) {
-      console.error("Failed to fetch metrics:", e);
-    } finally {
-      setLoading(false);
+  const fetchData = useCallback(async (retries = 3, delayMs = 2000) => {
+  try {
+    const username = sessionStorage.getItem("ventara_username") || "";
+    const res = await fetch(
+      `http://localhost:5000/forecasting_data?var=${selectedVar}`,
+      {
+        credentials: "include",
+        headers: { "X-Username": username },
+      }
+    );
+    const json = await res.json();
+
+    // Kalau metrics kosong dan masih ada retry, coba lagi
+    if ((json.error || !json.metrics || Object.keys(json.metrics).length === 0) && retries > 0) {
+      setTimeout(() => fetchData(retries - 1, delayMs), delayMs);
+      return;
     }
-  }, [selectedVar]);
+
+    if (json.error || !json.metrics) return;
+    setData(json);
+  } catch (e) {
+    console.error("Failed to fetch metrics:", e);
+  } finally {
+    setLoading(false);
+  }
+}, [selectedVar]);
 
   useEffect(() => {
     fetchData();

@@ -44,6 +44,8 @@ def worker_retrain(username, dataset_path, train_progress, train_lock):
         missing_cols = [c for c in REQUIRED_COLUMNS if c not in df_raw.columns]
         if missing_cols:
             raise ValueError(f"Kolom wajib tidak ditemukan: {missing_cols}")
+        
+        file_hash = compute_file_hash(dataset_path)
 
         # =========================
         # TRAIN ML — PER VARIABEL
@@ -162,6 +164,7 @@ def worker_retrain(username, dataset_path, train_progress, train_lock):
                     lstm_v,
                     bilstm_v,
                     var_name=var,
+                    file_hash=file_hash,
                     username=username,
                 )
 
@@ -180,7 +183,7 @@ def worker_retrain(username, dataset_path, train_progress, train_lock):
 
         log("💾 Simpan registry...")
 
-        file_hash = compute_file_hash(dataset_path)
+        
         skip_snapshot = get_skip_snapshot()
 
         save_model_registry(username, file_hash, dataset_path)
