@@ -9,9 +9,9 @@ history_bp = Blueprint("history_bp", __name__)
 # TIER LIMITS
 # =========================
 TIER_LIMITS = {
-    "free":    10 * 1024 * 1024,   # 10 MB
-    "basic":    100 * 1024 * 1024,   # 100 MB
-    "business": 10 * 1024 * 1024 * 1024, # 10 GB
+    "free":     125 * 1024 * 1024,   # 100 MB
+    "basic":    550 * 1024 * 1024,   # 125 MB
+    "business": 2048 * 1024 * 1024,  # 2048 MB
 }
 
 def get_username():

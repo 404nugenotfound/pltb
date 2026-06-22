@@ -1,6 +1,8 @@
 import json
 import os
 from config import USER_FOLDER
+from datetime import datetime
+import uuid
 
 
 def user_path(username: str) -> str:
@@ -33,3 +35,21 @@ def list_all_usernames() -> list[str]:
         for f in os.listdir(USER_FOLDER)
         if f.endswith(".json") and os.path.isfile(os.path.join(USER_FOLDER, f))
     ]
+
+def log_usage(username: str, feature: str) -> None:
+    """Catat 1 entry usage ke user['usage_logs']. Non-blocking — kalau gagal, silent."""
+    try:
+        user = load_user(username)
+        if not user:
+            return
+        logs = user.get("usage_logs", [])
+        logs.append({
+            "id": str(uuid.uuid4())[:8],
+            "feature": feature,
+            "timestamp": datetime.now().isoformat(),
+        })
+        # Batasi 500 entry terakhir biar file gak membengkak
+        user["usage_logs"] = logs[-500:]
+        save_user(user)
+    except Exception:
+        pass  # jangan sampe error logging ganggu proses utama

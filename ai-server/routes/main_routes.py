@@ -358,3 +358,18 @@ def forecast_result():
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@main_bp.route("/download_forecast")
+def download_forecast():
+    username = request.headers.get("X-Username") or session.get("username")
+    mode = request.args.get("mode", "general")
+    filename = (
+        f"{username}_hasil_prediksi_best.csv"
+        if mode == "best"
+        else f"{username}_hasil_prediksi_general.csv"
+    )
+    filepath = os.path.join(OUTPUT_FOLDER, filename)
+    if not os.path.exists(filepath):
+        return jsonify({"error": "File belum ada"}), 404
+
+    return send_file(filepath, as_attachment=True, download_name=filename)

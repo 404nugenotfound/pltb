@@ -10,10 +10,9 @@ from config import *
 
 from utils.dataset import *
 from utils.validation import *
-
 from utils.registry import *
 from utils.reload_state import *
-
+from utils.user_helpers import log_usage
 from utils.progress import *
 
 from training.worker_retrain import worker_retrain
@@ -52,6 +51,8 @@ def upload_dataset():
             return jsonify({"status": "error", "message": "File tidak ditemukan di server."}), 404
 
         set_active_dataset_path_for_user(final_path, username=username)
+        
+        log_usage(username, "training")
 
         with train_lock:
             train_progress[username] = {
@@ -214,6 +215,8 @@ def upload_dataset():
             "skip_snapshot": skip_snapshot,
         }
 
+    # TAMBAH INI (setelah with train_lock block, sebelum threading.Thread):
+    log_usage(username, "training")
     threading.Thread(
         target=worker_retrain,
         args=(username, final_path, train_progress, train_lock),

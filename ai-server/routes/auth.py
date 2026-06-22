@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 import json
 import os
+import requests
 from functools import wraps
 from datetime import date
 from config import USER_FOLDER
@@ -168,6 +169,25 @@ def register():
 
     return jsonify({"success": True, "message": f"Welcome {name}!"})
 
+def get_location_from_ip(ip):
+    try:
+        response = requests.get(
+            f"http://ip-api.com/json/{ip}",
+            timeout=3
+        )
+
+        data = response.json()
+
+        city = data.get("city")
+        country = data.get("country")
+
+        if city and country:
+            return f"{city}, {country}"
+
+    except Exception as e:
+        print("LOCATION ERROR:", e)
+
+    return "Unknown"
 
 # =========================
 # LOGIN (cek admin dulu, lalu user)
@@ -194,14 +214,20 @@ def login():
     if not found:
         user = load_user(username)
         if user and user["password"] == password:
+            if not user.get("isActive", True):
+                return jsonify({"success": False, "message": "Akun Anda telah dinonaktifkan. Hubungi administrator.", "code": "inactive"}), 403
             found = user
     
     if not found:
         all_users = load_all_users()
-        found = next(
+        matched = next(
             (u for u in all_users if u.get("email") == username and u["password"] == password),
             None
         )
+        if matched and not matched.get("isActive", True):
+            return jsonify({"success": False, "message": "Akun Anda telah dinonaktifkan. Hubungi administrator.", "code": "inactive"}), 403
+        if matched:
+            found = matched
 
     if not found:
         return jsonify({"success": False, "message": "Wrong username or password."}), 401
@@ -210,9 +236,24 @@ def login():
     session.clear()
 
     # buat session baru
+    # buat session baru
     session["username"] = found["username"]
     session["role"] = found["role"]
     session.modified = True
+
+    ip = request.headers.get(
+        "X-Forwarded-For",
+        request.remote_addr
+    ).split(",")[0].strip()
+
+    print("LOGIN IP =", ip)
+
+    if found["role"] == "user":
+        user = load_user(found["username"])
+
+        if user:
+            user["location"] = get_location_from_ip(ip)
+            save_user(user)
 
     increment_login_count_today()
 
@@ -318,17 +359,18 @@ def change_password():
 # =========================
 # GET USERS (user biasa aja)
 # =========================
-
 @auth_bp.route("/users", methods=["GET"])
 @require_admin
 def get_users():
-    return jsonify(load_all_users())
-
+    users = load_all_users()
+    # Jangan expose password ke FE
+    for u in users:
+        u.pop("password", None)
+    return jsonify(users)
 
 # =========================
 # GET / UPDATE USER DATA (admin panel: isActive, resourceLimits, storageLimitMb)
 # =========================
-
 @auth_bp.route("/user-data/<username>", methods=["GET"])
 @require_admin
 def get_user_data(username):
@@ -374,7 +416,6 @@ def update_user_data(username):
 # =========================
 # LOGIN COUNT HARI INI (admin panel)
 # =========================
-
 @auth_bp.route("/login-count", methods=["GET"])
 @require_admin
 def login_count():
@@ -384,7 +425,6 @@ def login_count():
 # =========================
 # GET ADMINS (opsional)
 # =========================
-
 @auth_bp.route("/admins", methods=["GET"])
 @require_admin
 def get_admins():

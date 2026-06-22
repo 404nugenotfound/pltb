@@ -38,7 +38,7 @@ def get_snap_dir_for_user(username: str) -> str:
 SNAPSHOT_LIMITS = {
     "free":   2,
     "basic":    3,
-    "business": -1,  # unlimited
+    "business": 5,  # unlimited
 }
 
 def get_snapshot_limit(tier: str) -> int:
