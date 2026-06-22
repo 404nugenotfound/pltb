@@ -14,7 +14,7 @@ import {
   getTodayKey
 } from '@/app/services/adminHelpers';
 
-import { PYTHON_API_URL } from '@/app/lib/api';
+const ADMIN_API = '/api/admin';
 
 export const useAdminData = () => {
 
@@ -49,10 +49,7 @@ useEffect(() => {
 
     try {
 
-      const res = await fetch(
-        `${PYTHON_API_URL}/users`,
-        { credentials: 'include' }
-      );
+      const res = await fetch(`${ADMIN_API}/users`);
 
       const data = await res.json();
 
@@ -97,10 +94,7 @@ useEffect(() => {
 
   const fetchLoginCount = async () => {
     try {
-      const res = await fetch(
-        `${PYTHON_API_URL}/login-count`,
-        { credentials: 'include' }
-      );
+      const res = await fetch(`${ADMIN_API}/login-count`);
       const data = await res.json();
       setLoginCountToday(data.count);
     } catch (_) {}
@@ -289,10 +283,9 @@ const activateUser = async (
   active: boolean = true
 ) => {
   try {
-    const res = await fetch(`${PYTHON_API_URL}/user-data/${username}`, {
-      method: 'PUT',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await fetch(`${ADMIN_API}/user-data/${username}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isActive: active }),
     });
 
@@ -313,10 +306,9 @@ const activateUser = async (
 
 const updateUserStorageLimit = async (username: string, mb: number): Promise<boolean> => {
   try {
-    const res = await fetch(`${PYTHON_API_URL}/user-data/${username}`, {
-      method: 'PUT',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
+    const res = await fetch(`${ADMIN_API}/user-data/${username}`, {
+  method: 'PUT',
+  headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ storageLimitMb: mb }),
     });
     return res.ok;

@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const username = req.nextUrl.searchParams.get("username") || "";
 
-  const res = await fetch(`http://127.0.0.1:5000/snapshots/${params.id}/restore`, {
+  const res = await fetch(`http://127.0.0.1:5000/snapshots/${id}/restore`, {
     method: "POST",
     cache: "no-store",
     headers: {

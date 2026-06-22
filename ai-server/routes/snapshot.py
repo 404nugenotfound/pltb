@@ -98,40 +98,58 @@ def delete_snapshot(snapshot_id):
 def restore_snapshot_route(snapshot_id):
     from utils.user_helpers import load_user, save_user
     from utils.reload_state import reload_all_globals
-
+ 
     username = get_username()
     if not username:
         return jsonify({"success": False, "message": "Not logged in."}), 401
-
+ 
     # ✅ Restore + baca registry LOKAL dari folder snapshot — sumber kebenaran independen
     registry = restore_snapshot(username, snapshot_id)
     if not registry:
         return jsonify({"success": False, "message": "Gagal restore snapshot atau registry.json tidak ditemukan."}), 500
-
+ 
     user = load_user(username)
     if not user:
         return jsonify({"success": False, "message": "User not found."}), 404
-
+ 
+    # ✅ registry["metrics"] disimpan oleh worker_retrain.py dalam bentuk flat
+    # per variabel: {var: {"ml": {...}, "dl": {...}}} — TANPA level file_hash.
+    # Tapi load_metrics() di training/metrics.py ngarepin struktur ternest:
+    # user["metrics"][var][file_hash_or_empty] = {"ml": {...}, "dl": {...}}.
+    # Tanpa reshape ini, lookup-nya selalu miss → metrics keliatan kosong
+    # setelah restore meskipun datanya sebenernya ada.
+    #
+    # Bucket "" dipilih karena itu emang fallback yang udah disiapin
+    # load_metrics() khusus buat hasil restore (lihat komentar di sana).
+    raw_metrics = registry.get("metrics", {})
+    reshaped_metrics = {}
+    for var, m in raw_metrics.items():
+        if isinstance(m, dict) and ("ml" in m or "dl" in m):
+            reshaped_metrics[var] = {"": {"ml": m.get("ml", {}), "dl": m.get("dl", {})}}
+        else:
+            # udah dalam bentuk lain (misal udah ternest) — biarin apa adanya
+            reshaped_metrics[var] = m
+ 
     # ✅ Update metrics di user JSON DULU — pakai data dari registry LOKAL
-    user["metrics"] = registry.get("metrics", {})
+    user["metrics"] = reshaped_metrics
     save_user(user)
-
+ 
     # Update active_dataset ke dataset dari registry LOKAL, lalu reload globals
     from utils.dataset import set_active_dataset_path_for_user
     from config import UPLOAD_FOLDER
-
+ 
     dataset_path = os.path.join(UPLOAD_FOLDER, registry.get("dataset", ""))
     print(f"🔍 RESTORE dataset_path: {dataset_path}")
     print(f"🔍 RESTORE exists: {os.path.exists(dataset_path)}")
     print(f"🔍 RESTORE username: {username}")
-
+ 
     if os.path.exists(dataset_path):
         set_active_dataset_path_for_user(dataset_path, username=username)
         # ✅ FIX — registry harus di-pass biar reload_all_globals masuk branch
         # "skip recompute" (load_metrics_for_var dari registry), bukan compute_metrics_fresh.
         # Sebelumnya parameter ini kelewat, jadi restore selalu ngitung ulang metrics dari nol.
         reload_all_globals(dataset_path, username=username, registry=registry)
-
+ 
     return jsonify(
         {
             "success": True,
