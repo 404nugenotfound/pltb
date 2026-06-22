@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import Sidebar from "@/app/components/layout/Sidebar";
 import Header from "@/app/components/layout/Header";
 
+import { useGuide, EDIT_PROFILE_STEPS } from "@/app/hooks/Useguide";
+import { GuideModal, GuideOverlay, GuideButton } from "@/app/components/guide";
+
 const DEFAULT_AVATAR = "/icon/default-avatar-profile.jpg";
+
+const EDIT_PROFILE_STORAGE_KEY = "ventara_guide_edit_profile_done";
 
 export default function EditProfilePage() {
   const router = useRouter();
@@ -25,6 +30,26 @@ export default function EditProfilePage() {
   const [showNewPw, setShowNewPw] = useState(false);
   const [showConfirmPw, setShowConfirmPw] = useState(false);
   const [avatarFile, setAvatarFile] = useState<string | null>(null);
+
+  const {
+    isOpen: guideOpen,
+    currentStep,
+    totalSteps,
+    step,
+    highlightRect,
+    isFirstStep,
+    isLastStep,
+    next,
+    back,
+    finish,
+    openGuide,
+    showFlyAnimation,
+    startCoords,
+    resetFlyAnimation,
+  } = useGuide({
+    steps: EDIT_PROFILE_STEPS,
+    storageKey: EDIT_PROFILE_STORAGE_KEY,
+  });
 
   const [toast, setToast] = useState<{
     msg: string;
@@ -54,7 +79,7 @@ export default function EditProfilePage() {
           username,
           name,
           email,
-          avatar: avatarFile ?? undefined,  // ✅ kirim kalau ada perubahan
+          avatar: avatarFile ?? undefined, // ✅ kirim kalau ada perubahan
         }),
       });
       const data = await res.json();
@@ -65,7 +90,7 @@ export default function EditProfilePage() {
       sessionStorage.setItem("ventara_name", data.name);
       sessionStorage.setItem("ventara_email", data.email);
       if (avatarFile) {
-        sessionStorage.setItem("ventara_avatar", avatarFile);  // ✅ simpan ke session setelah berhasil
+        sessionStorage.setItem("ventara_avatar", avatarFile); // ✅ simpan ke session setelah berhasil
         setAvatarFile(null);
       }
       showToast("Profil berhasil disimpan!", "success");
@@ -124,9 +149,9 @@ export default function EditProfilePage() {
     const reader = new FileReader();
     reader.onload = () => {
       const result = reader.result as string;
-      setAvatar(result);        // preview langsung
+      setAvatar(result); // preview langsung
       setAvatarError(false);
-      setAvatarFile(result);    // ✅ simpan ke state, belum kirim ke server
+      setAvatarFile(result); // ✅ simpan ke state, belum kirim ke server
     };
     reader.readAsDataURL(file);
   }
@@ -170,6 +195,7 @@ export default function EditProfilePage() {
             {/* AVATAR */}
             <div className="flex items-center gap-10 mb-8 max-w-4xl px-14 py-5 ml-12 bg-white border border-gray-100 rounded-xl">
               <div
+                data-guide="avatar-upload"
                 onClick={() => fileRef.current?.click()}
                 className="w-20 h-20 rounded-full bg-gray-200 overflow-hidden cursor-pointer hover:opacity-80 transition-opacity shrink-0"
               >
@@ -206,7 +232,10 @@ export default function EditProfilePage() {
             </div>
 
             {/* FORM */}
-            <div className="bg-white border border-gray-100 rounded-xl divide-y divide-gray-100 max-w-4xl ml-12">
+            <div
+              className="bg-white border border-gray-100 rounded-xl divide-y divide-gray-100 max-w-4xl ml-12"
+              data-guide="form-info"
+            >
               {/* Nama */}
               <div className="flex items-center justify-between py-4 px-12">
                 <div className="cursor-default">
@@ -254,7 +283,10 @@ export default function EditProfilePage() {
             </div>
 
             {/* PASSWORD */}
-            <div className="bg-white border border-gray-100 rounded-xl divide-y divide-gray-100 max-w-4xl ml-12 mt-6">
+            <div
+              className="bg-white border border-gray-100 rounded-xl divide-y divide-gray-100 max-w-4xl ml-12 mt-6"
+              data-guide="change-password"
+            >
               <div className="px-12 py-2 cursor-default">
                 <p className="text-md font-bold text-gray-700 my-2">
                   Change Password
@@ -455,6 +487,7 @@ export default function EditProfilePage() {
                 Batal
               </button>
               <button
+                data-guide="btn-save"
                 onClick={handleSave}
                 disabled={saving}
                 className="text-sm px-5 py-2 rounded-lg bg-teal-600 text-white hover:bg-teal-700 transition-colors disabled:opacity-60 cursor-pointer"
@@ -506,6 +539,32 @@ export default function EditProfilePage() {
           </div>
         )}
       </main>
+      {/* USER GUIDE */}
+      {guideOpen && (
+        <>
+          <GuideOverlay highlightRect={highlightRect} onSkip={finish} />
+
+          <GuideModal
+            isOpen={guideOpen}
+            step={step}
+            currentStep={currentStep}
+            totalSteps={totalSteps}
+            highlightRect={highlightRect}
+            isFirstStep={isFirstStep}
+            isLastStep={isLastStep}
+            onNext={next}
+            onBack={back}
+            onFinish={finish}
+          />
+        </>
+      )}
+
+      <GuideButton
+        onClick={openGuide}
+        showFlyAnimation={showFlyAnimation}
+        startCoords={startCoords}
+        onAnimationComplete={resetFlyAnimation}
+      />
     </div>
   );
 }

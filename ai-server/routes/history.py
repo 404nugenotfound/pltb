@@ -9,8 +9,8 @@ history_bp = Blueprint("history_bp", __name__)
 # TIER LIMITS
 # =========================
 TIER_LIMITS = {
-    "free":     125 * 1024 * 1024,   # 100 MB
-    "basic":    550 * 1024 * 1024,   # 125 MB
+    "free":     125 * 1024 * 1024,   # 125 MB
+    "basic":    550 * 1024 * 1024,   # 550 MB
     "business": 2048 * 1024 * 1024,  # 2048 MB
 }
 

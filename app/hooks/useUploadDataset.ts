@@ -121,6 +121,54 @@ export function useUploadDataset() {
 
   const resetDataset = () => setFileName("");
 
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+
+  // Dipanggil waktu user pilih "Upgrade Paket" di SnapshotFullModal
+  const openUpgradeModal = () => {
+    setSnapshotFull((prev) => ({ ...prev, visible: false })); // sembunyiin modal lama, data (pendingFilename) tetep kesimpen
+    setShowUpgradeModal(true);
+  };
+
+  const closeUpgradeModal = () => setShowUpgradeModal(false);
+
+  // Dipanggil dari UpgradeModal.onSuccess
+  const retryAfterUpgrade = async (onTrainingStarted?: () => void) => {
+    const { pendingFilename } = snapshotFull;
+    if (!pendingFilename) return;
+
+    setIsUploading(true);
+    setShowUpgradeModal(false);
+
+    try {
+      const formData = new FormData();
+      formData.append("filename", pendingFilename);
+      // sengaja TANPA skip_snapshot — biar backend create snapshot baru
+
+      const data = await uploadDataset(formData);
+
+      if (data.status === "started") {
+        setFileName(`✅ ${pendingFilename} diupload. Training dimulai dengan snapshot baru...`);
+        onTrainingStarted?.();
+        return;
+      }
+
+      // edge case: upgrade kepanggil tapi limit di BE belum ke-refresh / race condition
+      if (data.status === "snapshot_full") {
+        setSnapshotFull({
+          visible: true,
+          snapshotCount: data.snapshot_count,
+          snapshotLimit: data.snapshot_limit,
+          tier: data.tier,
+          pendingFilename: data.filename ?? pendingFilename,
+        });
+      }
+    } catch {
+      setFileName("❌ Gagal melanjutkan training setelah upgrade");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   return {
     fileName,
     isUploading,
@@ -129,5 +177,9 @@ export function useUploadDataset() {
     snapshotFull,
     continueWithoutSnapshot,
     dismissSnapshotFull,
+    showUpgradeModal,        // ← tambah ini
+    openUpgradeModal,        // ← tambah ini
+    closeUpgradeModal,       // ← tambah ini
+    retryAfterUpgrade, 
   };
 }

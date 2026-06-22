@@ -20,8 +20,8 @@ export default function UsersPage() {
         <Header />
         <div className="p-8">
           <div className="max-w-5xl mx-auto">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-1">Manage Users</h2>
+            <div className="mb-6 cursor-default">
+              <h2 className="text-2xl font-bold text-gray-900 mb-1 cur">Manage Users</h2>
               <p className="text-gray-600 text-sm">Kelola pengguna dan pantau aktivitas sistem</p>
             </div>
             <UsersTab

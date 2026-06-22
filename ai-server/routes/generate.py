@@ -14,7 +14,6 @@ from config import TARGET
 
 from utils.dataset import *
 from utils.progress import *
-from utils.user_helpers import log_usage
 
 from training.nlp import *
 from training.metrics import load_metrics_for_var, load_dl_metrics_for_var
@@ -879,8 +878,6 @@ def generate_full():
         daemon=True,
     ).start()
 
-    # TAMBAH INI:
-    log_usage(username, "generate_full")
     return jsonify({"status": "started"})
 
 
@@ -931,8 +928,6 @@ def generate_best():
         daemon=True,
     ).start()
 
-    # TAMBAH INI:
-    log_usage(username, "generate_best")
     return jsonify({"status": "started"})
 
 

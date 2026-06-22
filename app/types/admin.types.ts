@@ -10,6 +10,8 @@ export interface User {
   usageCount: number;
   location: string;
   isActive: boolean;
+  // TAMBAH INI:
+  usageLogs?: { id: string; feature: string; timestamp: string }[];
 }
 
 export interface ResourceLimit {
@@ -39,6 +41,9 @@ export interface DashboardStats {
   activeUsersToday: number;
   totalUsersToday: number;
   totalUsageToday: number;
+  // TAMBAH INI:
+  generateToday: number;
+  trainingToday: number;
   topLocations: { location: string; count: number }[];
   recentActivities: UsageLog[];
   activeUsers: User[];

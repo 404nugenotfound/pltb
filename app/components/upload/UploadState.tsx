@@ -4,8 +4,10 @@ import { useRef } from "react";
 import LoadingState from "./LoadingState";
 import NLPResult from "./NLPResult";
 import SnapshotFullModal from "./Snapshotfullmodal";
+import UpgradeModal from "@/app/components/payments/UpgradeModal";
 import { useUploadDataset } from "@/app/hooks/useUploadDataset";
 import { useTrainToast } from "@/app/hooks/useTrainToast";
+import { useStorage } from "@/app/context/StorageContext";
 
 interface UploadStateProps {
   uiState: "idle" | "loading" | "nlp";
@@ -35,19 +37,19 @@ export default function UploadState({
     snapshotFull,
     continueWithoutSnapshot,
     dismissSnapshotFull,
+    showUpgradeModal,
+    openUpgradeModal,
+    closeUpgradeModal,
+    retryAfterUpgrade,
   } = useUploadDataset();
 
   const train = useTrainToast();
+  const { storageInfo, refreshStorage } = useStorage();
 
   function onFilePicked(files: FileList | null) {
     handleFiles(
       files,
-      // onTrainingStarted — status "started"
-      () =>
-        train.startTrainToast(() => {
-          onTrainingComplete?.();
-        }),
-      // onReload — status "skipped"
+      () => train.startTrainToast(() => { onTrainingComplete?.(); }),
       () => window.location.reload(),
     );
   }
@@ -62,7 +64,7 @@ export default function UploadState({
 
   return (
     <>
-      {/* Modal snapshot penuh — render di atas segalanya */}
+      {/* Modal snapshot penuh */}
       <SnapshotFullModal
         visible={snapshotFull.visible}
         snapshotCount={snapshotFull.snapshotCount}
@@ -71,13 +73,25 @@ export default function UploadState({
         pendingFilename={snapshotFull.pendingFilename}
         onContinueWithoutSnapshot={() =>
           continueWithoutSnapshot(() =>
-            train.startTrainToast(() => {
-              onTrainingComplete?.();
-            }),
+            train.startTrainToast(() => { onTrainingComplete?.(); })
           )
         }
         onDismiss={dismissSnapshotFull}
+        onUpgrade={openUpgradeModal}
       />
+
+      {/* Modal upgrade — muncul setelah user klik "Upgrade Paket" */}
+      {showUpgradeModal && (
+        <UpgradeModal
+          storageInfo={storageInfo}
+          onClose={closeUpgradeModal}
+          onSuccess={() =>
+            retryAfterUpgrade(() =>
+              train.startTrainToast(() => { onTrainingComplete?.(); })
+            )
+          }
+        />
+      )}
 
       {uiState === "idle" && (
         <div

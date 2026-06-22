@@ -53,3 +53,27 @@ def log_usage(username: str, feature: str) -> None:
         save_user(user)
     except Exception:
         pass  # jangan sampe error logging ganggu proses utama
+    
+def get_snapshot_by_id(username, snapshot_id):
+    user = load_user(username)
+    if not user:
+        return None
+
+    return next(
+        (s for s in user.get("snapshots", []) if s["id"] == snapshot_id),
+        None
+    )
+
+
+def add_forecast_record(username, snapshot_id, record):
+    user = load_user(username)
+    if not user:
+        return False
+
+    for s in user.get("snapshots", []):
+        if s["id"] == snapshot_id:
+            s.setdefault("forecasts", []).append(record)
+            save_user(user)
+            return True
+
+    return False

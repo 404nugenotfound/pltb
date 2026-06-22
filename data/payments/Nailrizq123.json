@@ -1,0 +1,11 @@
+[
+  {
+    "transaction_id": "679a2829-5572-424f-aa9c-5f92f4fcba21",
+    "tier": "basic",
+    "amount": 2000,
+    "payment_type": "qris",
+    "status": "settled",
+    "reference": "ventara-basic-Nailrizq123",
+    "paid_at": "2026-06-22T13:44:37.215Z"
+  }
+]

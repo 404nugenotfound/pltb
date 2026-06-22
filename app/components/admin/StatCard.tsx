@@ -17,7 +17,7 @@ export const StatCard = ({ title, value, icon, subtitle, isFirst = false, isSeco
   };
   
   return (
-    <div className={`relative overflow-hidden rounded-xl bg-linear-to-br ${getGradient()} p-6 pb-14 text-white shadow-md transition-all duration-300 hover:scale-[1.02] hover:shadow-lg`}>
+    <div className={`relative overflow-hidden rounded-xl bg-linear-to-br ${getGradient()} p-6 pb-6 text-white shadow-md transition-all duration-300 hover:scale-[1.02] hover:shadow-lg`}>
       <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/2" />
       <div className="absolute bottom-0 left-0 w-20 h-20 bg-white/5 rounded-full translate-y-1/2 -translate-x-1/2" />
       <div className="relative z-10">

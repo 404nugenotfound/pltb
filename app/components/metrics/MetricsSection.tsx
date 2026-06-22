@@ -186,7 +186,7 @@ export default function MetricsSection({
 
     return (
       <div className="mb-6">
-        <h4 className="font-medium text-gray-700 mb-3 text-sm">
+        <h4 className="font-medium text-gray-700 mb-3 text-sm cursor-default">
           Model Ensemble yang Digunakan
         </h4>
         <div className="grid grid-cols-3 gap-4">
@@ -215,10 +215,10 @@ export default function MetricsSection({
 
   return (
     <div className="mb-6">
-      <h4 className="font-medium text-gray-700 mb-3 text-sm">
+      <h4 className="font-medium text-gray-700 mb-3 text-sm cursor-default">
         Model Ensemble yang Digunakan
       </h4>
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-4 cursor-default">
         {orderedMetrics.slice(0, 3).map((model) => {
           const m = metrics[model];
           if (!m) return null;
@@ -242,7 +242,7 @@ export default function MetricsSection({
           );
         })}
       </div>
-      <div className="flex justify-center gap-4 mt-4">
+      <div className="flex justify-center gap-4 mt-4 cursor-default">
         {orderedMetrics.slice(3).map((model) => {
           const m = metrics[model];
           if (!m) return null;

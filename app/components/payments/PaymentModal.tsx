@@ -10,9 +10,9 @@ const TIER_AMOUNT: Record<string, number> = {
 }
 
 const TIER_LABEL: Record<string, string> = {
-  basic: "Basic (100 MB + 2 Cache)",
+  basic: "Basic (550 MB + 3 Cache)",
   
-  business: "Business (2048 MB)",
+  business: "Business (2048 MB + 5 cache)",
 }
 
 const PAYMENT_LABEL: Record<string, string> = {

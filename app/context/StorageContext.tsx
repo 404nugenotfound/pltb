@@ -34,10 +34,10 @@ export function StorageProvider({
     useState<StorageInfo>({
       tier: "free",
       usage_mb: 0,
-      limit_mb: 10,
+      limit_mb: 125,
       percent: 0,
       hash_count: 0,             // ← tambah
-  snapshot_limit: 2,
+      snapshot_limit: 2,
     });
 
   const refreshStorage = async () => {

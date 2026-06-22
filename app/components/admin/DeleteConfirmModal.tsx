@@ -27,7 +27,7 @@ export const DeleteConfirmModal = ({ isOpen, username, onConfirm, onCancel, mode
             </svg>
           )}
         </div>
-        <h3 className="text-lg font-bold text-gray-800 text-center mb-2">
+        <h3 className="text-lg font-bold text-gray-800 text-center mb-2 ">
           {isActivate ? 'Konfirmasi Aktifkan' : 'Konfirmasi Nonaktifkan'}
         </h3>
         <p className="text-gray-500 text-sm text-center mb-6">

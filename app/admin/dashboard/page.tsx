@@ -15,8 +15,8 @@ export default function DashboardPage() {
         <div className="p-8">
           <div className="max-w-5xl mx-auto">
             <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-1">Admin Panel</h2>
-              <p className="text-gray-600 text-sm">Kelola pengguna, resource, dan pantau aktivitas sistem</p>
+              <h2 className="text-2xl font-bold text-gray-900 mb-1 cursor-default">Admin Panel</h2>
+              <p className="text-gray-600 text-sm cursor-default">Kelola pengguna, resource, dan pantau aktivitas sistem</p>
             </div>
             <DashboardTab stats={dashboardStats} />
           </div>

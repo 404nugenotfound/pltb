@@ -49,7 +49,7 @@ export const UsersTab = ({
         <div className="overflow-x-auto">
           <table className="w-full min-w-200">
             <thead>
-              <tr className="border-b border-gray-100 bg-linear-to-r from-[#e6f6f4]/30 to-transparent">
+              <tr className="border-b border-gray-100 bg-linear-to-r from-[#e6f6f4]/30 to-transparent cursor-default">
                 <th className="px-6 py-4 text-left text-xs font-semibold text-[#007f6d] uppercase tracking-wider">Username</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-[#007f6d] uppercase tracking-wider">Email</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-[#007f6d] uppercase tracking-wider">Lokasi</th>
@@ -62,7 +62,7 @@ export const UsersTab = ({
             <tbody>
               {filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="text-center py-12 text-gray-400">
+                  <td colSpan={7} className="text-center py-12 text-gray-400 cursor">
                     <div className="flex flex-col items-center gap-2">
                       <svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
@@ -83,20 +83,20 @@ export const UsersTab = ({
                         }`}>
                           {user.username.charAt(0).toUpperCase()}
                         </div>
-                        <span className="font-medium text-gray-700">{user.username}</span>
+                        <span className="font-medium text-gray-700 cursor-default">{user.username}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-gray-500 text-sm">{user.email}</td>
-                    <td className="px-6 py-4 text-gray-500 text-sm">{user.location}</td>
-                    <td className="px-6 py-4 text-gray-400 text-xs font-mono">{formatDate(user.registeredAt)}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 text-gray-500 text-sm cursor-default">{user.email}</td>
+                    <td className="px-6 py-4 text-gray-500 text-sm cursor-default">{user.location}</td>
+                    <td className="px-6 py-4 text-gray-400 text-xs font-mono cursor-default">{formatDate(user.registeredAt)}</td>
+                    <td className="px-6 py-4 cursor-default">
                       <div className="flex flex-col">
                         <span className="text-sm font-semibold text-[#00a991]">{user.usageCount} kali</span>
                         <span className="text-xs text-gray-400">Hari ini: {getUserUsageToday(user.username)}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${
+                      <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium cursor-default ${
                         user.isActive 
                           ? 'bg-[#e6f6f4] text-[#00a991] border border-[#00a991]/30' 
                           : 'bg-gray-100 text-gray-500 border border-gray-200'
@@ -110,7 +110,7 @@ export const UsersTab = ({
                         {user.isActive ? (
                           <button
                             onClick={() => onDeactivateUser(user.username)}
-                            className="text-gray-400 hover:text-red-500 transition-all px-3 py-1.5 rounded-lg hover:bg-red-50"
+                            className="text-gray-400 hover:text-red-500 transition-all px-3 py-1.5 rounded-lg hover:bg-red-50 cursor-pointer"
                             title="Nonaktifkan Pengguna"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -122,7 +122,7 @@ export const UsersTab = ({
                         ) : (
                           <button
                             onClick={() => onActivateUser(user.username)}
-                            className="text-gray-400 hover:text-[#00a991] transition-all px-3 py-1.5 rounded-lg hover:bg-[#e6f6f4]"
+                            className="text-gray-400 hover:text-[#00a991] transition-all px-3 py-1.5 rounded-lg hover:bg-[#e6f6f4] cursor-pointer"
                             title="Aktifkan Pengguna"
                           >
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

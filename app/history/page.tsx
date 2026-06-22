@@ -7,7 +7,13 @@ import { useStorage } from "@/app/context/StorageContext";
 import PaymentModal from "@/app/components/payments/PaymentModal";
 import UpgradeModal from "@/app/components/payments/UpgradeModal";
 
-type AlgoKey = "Best Model" | "General Model";
+// ─── Guide ───
+import { useGuide, HISTORIS_STEPS } from "@/app/hooks/Useguide";
+import { GuideModal, GuideOverlay, GuideButton } from "@/app/components/guide";
+
+const HISTORIS_STORAGE_KEY = "ventara_guide_historis_done";
+
+type AlgoKey = "Best Model" | "General Model" | "Best";
 type StatusKey = "Selesai" | "Error" | "Berjalan";
 
 interface HasilItem {
@@ -29,6 +35,7 @@ interface HistorisItem {
 const ALGO_STYLE: Record<AlgoKey, string> = {
   "Best Model": "bg-amber-50 text-amber-600 border border-amber-200",
   "General Model": "bg-blue-50 text-blue-700",
+  Best: "bg-amber-50 text-amber-600 border border-amber-200",
 };
 
 const STATUS_STYLE: Record<StatusKey, string> = {
@@ -52,7 +59,26 @@ export default function HistorisPage() {
 
   const { storageInfo, refreshStorage } = useStorage();
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);
+  // ─── Guide ───
+  const {
+    isOpen: guideOpen,
+    currentStep,
+    totalSteps,
+    step,
+    highlightRect,
+    isFirstStep,
+    isLastStep,
+    next,
+    back,
+    finish,
+    openGuide,
+    showFlyAnimation,
+    startCoords,
+    resetFlyAnimation,
+  } = useGuide({
+    steps: HISTORIS_STEPS,
+    storageKey: HISTORIS_STORAGE_KEY,
+  });
 
   useEffect(() => {
     async function init() {
@@ -69,28 +95,8 @@ export default function HistorisPage() {
       }
     }
 
-    async function fetchPaymentHistory() {
-      const username = sessionStorage.getItem("ventara_username") || "";
-      if (!username) return;
-      try {
-        const res = await fetch(`/api/payment/history?username=${username}`);
-        const json = await res.json();
-        if (json.success) setPaymentHistory(json.data);
-      } catch {}
-    }
-
     init();
-    fetchPaymentHistory();
   }, []);
-
-  async function refreshPaymentHistory() {
-    const username = sessionStorage.getItem("ventara_username") || "";
-    try {
-      const res = await fetch(`/api/payment/history?username=${username}`);
-      const json = await res.json();
-      if (json.success) setPaymentHistory(json.data);
-    } catch {}
-  }
 
   console.log("DATA STATE =", data);
 
@@ -102,6 +108,32 @@ export default function HistorisPage() {
       d.status.toLowerCase().includes(q)
     );
   });
+
+  async function handleDownload(row: HistorisItem) {
+    const username = sessionStorage.getItem("ventara_username") || "";
+    const mode = row.algo === "Best Model" ? "best" : "general";
+
+    const res = await fetch(
+      `http://localhost:5000/download_forecast?mode=${mode}`,
+      {
+        credentials: "include",
+        headers: { "X-Username": username },
+      },
+    );
+
+    if (!res.ok) {
+      alert("File belum tersedia");
+      return;
+    }
+
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `hasil_prediksi_${mode}_${row.file}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   async function handleDelete(id: number) {
     const username = sessionStorage.getItem("ventara_username") || "";
@@ -126,7 +158,7 @@ export default function HistorisPage() {
         <Header />
 
         <div className="p-8">
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-5xl mx-auto cursor-default">
             {/* Page header */}
             <div className="mb-6">
               <h2 className="text-2xl font-bold text-gray-900 mb-1">
@@ -139,7 +171,7 @@ export default function HistorisPage() {
 
             {/* Toolbar */}
             <div className="flex items-center gap-3 mb-3">
-              <div className="relative flex-1">
+              <div className="relative flex-1" data-guide="search-historis">
                 <svg
                   className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
                   fill="none"
@@ -167,7 +199,10 @@ export default function HistorisPage() {
             </div>
 
             {/* Storage Bar */}
-            <div className="bg-white border border-gray-200 rounded-xl px-5 py-3.5 mb-5 flex items-center gap-4">
+            <div
+              className="bg-white border border-gray-200 rounded-xl px-5 py-3.5 mb-5 flex items-center gap-4"
+              data-guide="storage-bar"
+            >
               <div className="flex-1">
                 <div className="flex justify-between items-center mb-1.5">
                   <span className="text-xs text-gray-500">
@@ -196,30 +231,49 @@ export default function HistorisPage() {
                 </div>
               </div>
               <button
+                data-guide="btn-upgrade"
                 onClick={() => setShowUpgradeModal(true)}
                 className="text-sm text-teal-600 font-medium hover:text-teal-700 whitespace-nowrap border border-teal-200 px-4 py-2 rounded-xl hover:bg-teal-50 cursor-pointer transition"
               >
-                Upgrade (Free)
+                Upgrade
               </button>
             </div>
 
             {/* Table */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div
+              className="bg-white border border-gray-200 rounded-xl overflow-hidden"
+              data-guide="table-historis"
+            >
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-gray-200">
-                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[20%]">Waktu</th>
-                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[28%]">File Data</th>
-                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[15%]">Algoritma</th>
-                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[12%]">Periode</th>
-                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[12%]">Status</th>
-                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[13%]">Aksi</th>
+                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[20%]">
+                      Waktu
+                    </th>
+                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[28%]">
+                      File Data
+                    </th>
+                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[15%]">
+                      Algoritma
+                    </th>
+                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[12%]">
+                      Periode
+                    </th>
+                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[12%]">
+                      Status
+                    </th>
+                    <th className="text-center px-4 py-4 text-xs font-medium text-gray-500 w-[13%]">
+                      Aksi
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="text-center py-12 text-gray-400 text-sm">
+                      <td
+                        colSpan={6}
+                        className="text-center py-12 text-gray-400 text-sm"
+                      >
                         Tidak ada data yang cocok
                       </td>
                     </tr>
@@ -229,30 +283,54 @@ export default function HistorisPage() {
                         key={row.id}
                         className="border-b border-gray-100 last:border-b-0 hover:bg-gray-50 transition-colors"
                       >
-                        <td className="px-4 py-4 text-xs text-gray-500 text-center">{row.waktu}</td>
-                        <td className="px-4 py-4 text-sm text-gray-700 text-center">{row.file}</td>
+                        <td className="px-4 py-4 text-xs text-gray-500 text-center">
+                          {row.waktu}
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-700 text-center">
+                          {row.file}
+                        </td>
                         <td className="px-4 py-4 text-center">
-                          <span className={`inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full ${ALGO_STYLE[row.algo as AlgoKey] ?? "bg-gray-50 text-gray-700"}`}>
+                          <span
+                            className={`inline-flex items-center text-xs font-medium px-2.5 py-1 rounded-full ${ALGO_STYLE[row.algo as AlgoKey] ?? "bg-gray-50 text-gray-700"}`}
+                          >
                             {row.algo}
                           </span>
                         </td>
-                        <td className="px-4 py-4 text-sm text-gray-600 text-center">{row.periode}</td>
+                        <td className="px-4 py-4 text-sm text-gray-600 text-center">
+                          {row.periode}
+                        </td>
                         <td className="px-4 py-4 text-center">
-                          <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_STYLE[row.status]}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[row.status]}`} />
+                          <span
+                            className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${STATUS_STYLE[row.status]}`}
+                          >
+                            <span
+                              className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[row.status]}`}
+                            />
                             {row.status}
                           </span>
                         </td>
                         <td className="px-4 py-4">
-                          <div className="flex items-center justify-center gap-2">
+                          <div
+                            className="flex items-center justify-center gap-2"
+                            data-guide="btn-aksi"
+                          >
                             <button
                               onClick={() => {
-                                const username = sessionStorage.getItem("ventara_username");
-                                sessionStorage.setItem(`ventara_ui_state_${username}`, "nlp");
-                                sessionStorage.setItem(`ventara_nlp_report_${username}`, row.nlp_report || "");
+                                const username =
+                                  sessionStorage.getItem("ventara_username");
+                                sessionStorage.setItem(
+                                  `ventara_ui_state_${username}`,
+                                  "nlp",
+                                );
+                                sessionStorage.setItem(
+                                  `ventara_nlp_report_${username}`,
+                                  row.nlp_report || "",
+                                );
                                 sessionStorage.setItem(
                                   `ventara_generate_mode_${username}`,
-                                  row.algo === "Best Model" ? "best" : "general",
+                                  row.algo === "Best Model"
+                                    ? "best"
+                                    : "general",
                                 );
                                 sessionStorage.setItem(
                                   `ventara_forecast_data_${username}`,
@@ -263,17 +341,24 @@ export default function HistorisPage() {
                               className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-colors cursor-pointer"
                               title="Lihat detail"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                              </svg>
-                            </button>
-                            <button
-                              className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-teal-600 hover:bg-teal-50 hover:border-teal-200 transition-colors cursor-pointer"
-                              title="Unduh CSV"
-                            >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                                />
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+                                />
                               </svg>
                             </button>
                             <button
@@ -281,8 +366,18 @@ export default function HistorisPage() {
                               className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-red-600 hover:bg-red-50 hover:border-red-200 transition-colors cursor-pointer"
                               title="Hapus"
                             >
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              <svg
+                                className="w-4 h-4"
+                                fill="none"
+                                stroke="currentColor"
+                                viewBox="0 0 24 24"
+                              >
+                                <path
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  strokeWidth={2}
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                                />
                               </svg>
                             </button>
                           </div>
@@ -302,9 +397,16 @@ export default function HistorisPage() {
             <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold text-gray-900">Detail Prediksi</h3>
-                <button onClick={() => setDetailItem(null)} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+                <button
+                  onClick={() => setDetailItem(null)}
+                  className="text-gray-400 hover:text-gray-600 text-lg"
+                >
+                  ✕
+                </button>
               </div>
-              <p className="text-xs text-gray-500 mb-1">{detailItem.waktu} • {detailItem.file}</p>
+              <p className="text-xs text-gray-500 mb-1">
+                {detailItem.waktu} • {detailItem.file}
+              </p>
               <div className="mt-3 p-4 bg-teal-50 rounded-xl border border-teal-100">
                 <p className="text-sm text-gray-700 leading-relaxed">
                   {detailItem.nlp_report || "Tidak ada laporan AI tersedia."}
@@ -320,16 +422,30 @@ export default function HistorisPage() {
             <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center shrink-0">
-                  <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  <svg
+                    className="w-5 h-5 text-red-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+                    />
                   </svg>
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">Hapus Riwayat</h3>
-                  <p className="text-sm text-gray-500 mt-0.5">Tindakan ini tidak dapat dibatalkan.</p>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    Tindakan ini tidak dapat dibatalkan.
+                  </p>
                 </div>
               </div>
-              <p className="text-sm text-gray-600 mb-6">Apakah Anda yakin ingin menghapus riwayat ini?</p>
+              <p className="text-sm text-gray-600 mb-6">
+                Apakah Anda yakin ingin menghapus riwayat ini?
+              </p>
               <div className="flex gap-3 justify-end">
                 <button
                   onClick={() => setDeleteConfirmId(null)}
@@ -338,7 +454,10 @@ export default function HistorisPage() {
                   Batal
                 </button>
                 <button
-                  onClick={() => { handleDelete(deleteConfirmId); setDeleteConfirmId(null); }}
+                  onClick={() => {
+                    handleDelete(deleteConfirmId);
+                    setDeleteConfirmId(null);
+                  }}
                   disabled={deletingId === deleteConfirmId}
                   className="px-4 py-2 text-sm rounded-lg bg-red-500 text-white hover:bg-red-800 transition-colors disabled:opacity-50 cursor-pointer"
                 >
@@ -353,15 +472,39 @@ export default function HistorisPage() {
         {showUpgradeModal && (
           <UpgradeModal
             storageInfo={storageInfo}
-            paymentHistory={paymentHistory}
             onClose={() => setShowUpgradeModal(false)}
             onSuccess={async () => {
               await refreshStorage();
-              await refreshPaymentHistory();
             }}
           />
         )}
       </main>
+      {/* ─── USER GUIDE ─── */}
+      {guideOpen && (
+        <>
+          <GuideOverlay highlightRect={highlightRect} onSkip={finish} />
+
+          <GuideModal
+            isOpen={guideOpen}
+            step={step}
+            currentStep={currentStep}
+            totalSteps={totalSteps}
+            highlightRect={highlightRect}
+            isFirstStep={isFirstStep}
+            isLastStep={isLastStep}
+            onNext={next}
+            onBack={back}
+            onFinish={finish}
+          />
+        </>
+      )}
+
+      <GuideButton
+        onClick={openGuide}
+        showFlyAnimation={showFlyAnimation}
+        startCoords={startCoords}
+        onAnimationComplete={resetFlyAnimation}
+      />
     </div>
   );
 }

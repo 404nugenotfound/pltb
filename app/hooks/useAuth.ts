@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { PYTHON_API_URL } from '@/app/lib/api';
+import toast from 'react-hot-toast';
 
 export type AuthView = 'landing' | 'register' | 'login';
 
@@ -17,10 +17,9 @@ export function useAuth() {
     // token: string
 ) => {
   try {
-    const res = await fetch(`${PYTHON_API_URL}/login`, {
+    const res = await fetch(`/api/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      credentials: "include",
       body: JSON.stringify({
         username,
         password,
@@ -31,8 +30,29 @@ export function useAuth() {
     const data = await res.json();
 
     if (!data.success) {
-      setIsError(true);
-      setTimeout(() => setIsError(false), 4000);
+      if (data.code === "inactive") {
+        toast.error("Akun anda telah dinonaktifkan. Hubungi administrator segera.", {
+          duration: 5000,
+          position: "bottom-right",
+          style: {
+            background: '#fff',
+            color: '#1f2937',
+            borderRadius: '16px',
+            border: '1px solid #fee2e2',
+            padding: '16px',
+            fontSize: '15px',
+            fontWeight: '600',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
+            gap: '12px',
+          },
+          iconTheme: {
+            primary: '#ef4444',
+            secondary: '#fff',
+          },
+        });
+        setIsError(true);
+        setTimeout(() => setIsError(false), 5000);
+      }
       return;
     }
 
@@ -70,10 +90,10 @@ export function useAuth() {
     }
 
     try {
-      const res = await fetch(`/api/login`, {
+      const res = await fetch(`/api/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, email, password, name: username }),
     });
 
       const data = await res.json();

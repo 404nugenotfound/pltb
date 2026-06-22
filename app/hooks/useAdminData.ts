@@ -32,6 +32,8 @@ export const useAdminData = () => {
       activeUsersToday: 0,
       totalUsersToday: 0,
       totalUsageToday: 0,
+      generateToday: 0,
+      trainingToday: 0,
       topLocations: [],
       recentActivities: [],
       activeUsers: [],
@@ -41,106 +43,104 @@ export const useAdminData = () => {
   const [loginCountToday, setLoginCountToday] = useState(0);
 
   // =========================
-// LOAD USERS FROM FLASK
-// =========================
-useEffect(() => {
+  // LOAD USERS FROM FLASK
+  // =========================
+  useEffect(() => {
 
-  const fetchUsers = async () => {
+    const fetchUsers = async () => {
 
-    try {
+      try {
 
-      const res = await fetch(`${ADMIN_API}/users`);
+        const res = await fetch(`${ADMIN_API}/users`);
 
-      const data = await res.json();
+        const data = await res.json();
 
-      const formattedUsers = data.map(
-        (u:any,index:number)=>({
+        const formattedUsers = data.map(
+          (u:any,index:number)=>({
 
-          id:String(index+1),
-          username:u.username,
+            id:String(index+1),
+            username:u.username,
 
-          email:u.email || "",
+            email:u.email || "",
 
-          registeredAt:
-            u.registeredAt || "",
+            registeredAt:
+              u.registeredAt || "",
 
-          lastActive:
-            u.lastActive || "",
+            lastActive:
+              u.lastActive || "",
 
-          lastLogin:
-            u.lastLogin || "",
+            lastLogin:
+              u.lastLogin || "",
 
-          lastLogout:
-            u.lastLogout || "",
+            lastLogout:
+              u.lastLogout || "",
 
-          usageCount:
-            u.usageCount || 0,
+            usageCount:
+              u.usageCount || 0,
 
-          location:
-            u.location || "",
+            location:
+              u.location || "",
 
-          isActive: u.isActive ?? true,
+            isActive: u.isActive ?? true,
+            usageLogs: u.usage_logs || [],
 
-        }));
+          }));
 
-      setUsers(formattedUsers);
+        setUsers(formattedUsers);
 
-    } catch (err) {
+      } catch (err) {
 
-      // silent — server mungkin sibuk
+        // silent — server mungkin sibuk
 
-    }
-  };
+      }
+    };
 
-  const fetchLoginCount = async () => {
-    try {
-      const res = await fetch(`${ADMIN_API}/login-count`);
-      const data = await res.json();
-      setLoginCountToday(data.count);
-    } catch (_) {}
-  };
+    const fetchLoginCount = async () => {
+      try {
+        const res = await fetch(`${ADMIN_API}/login-count`);
+        const data = await res.json();
+        setLoginCountToday(data.count);
+      } catch (_) {}
+    };
 
-  fetchUsers();
-  fetchLoginCount();
-  const interval = setInterval(() => {
     fetchUsers();
     fetchLoginCount();
-  }, 5000);
-  return () => clearInterval(interval);
+    const interval = setInterval(() => {
+      fetchUsers();
+      fetchLoginCount();
+    }, 5000);
+    return () => clearInterval(interval);
 
-}, []);
+  }, []);
+
   // =========================
   // LOAD INITIAL DATA (localStorage + Flask)
   // =========================
   useEffect(() => {
-
-    const storedLimits =
-      localStorage.getItem(
-        'ventara-resource-limits'
-      );
-
+    const storedLimits = localStorage.getItem('ventara-resource-limits');
     if (storedLimits) {
-      setResourceLimits(
-        JSON.parse(storedLimits)
-      );
+      setResourceLimits(JSON.parse(storedLimits));
     }
 
-    const storedLogs =
-      localStorage.getItem(
-        'ventara-usage-logs'
-      );
+    // Gabungin semua usage_logs dari semua user
+    const allLogs = users.flatMap(u =>
+      (u.usageLogs || []).map(log => ({
+        id: log.id,
+        userId: u.id,
+        username: u.username,
+        featureId: log.feature,
+        featureName: log.feature === 'generate_full'
+          ? 'Generate General'
+          : log.feature === 'generate_best'
+          ? 'Generate Best'
+          : 'Training',
+        location: u.location || 'Unknown',
+        timestamp: log.timestamp,
+      }))
+    );
 
-    if (storedLogs) {
-
-      setUsageLogs(
-        JSON.parse(storedLogs)
-      );
-
-    } else {
-      setUsageLogs([]);
-    }
-
-  }, []);
+    setUsageLogs(allLogs);
+  }, [users]);
 
   // =========================
   // DASHBOARD STATS
@@ -225,14 +225,23 @@ useEffect(() => {
       return { day: dayNames[d.getDay()], count };
     });
 
+    const generateToday = todayLogs.filter(
+      log => log.featureId === 'generate_full' || log.featureId === 'generate_best'
+    ).length;
+
+    const trainingToday = todayLogs.filter(
+      log => log.featureId === 'training'
+    ).length;
+
     setDashboardStats({
       totalUsers: users.length,
       activeUsersToday,
       totalUsersToday: usersToday.length,
       totalUsageToday: todayLogs.length + loginCountToday,
+      generateToday,   // ← tambah
+      trainingToday,   // ← tambah
       topLocations,
-      recentActivities:
-        usageLogs.slice(-10).reverse(),
+      recentActivities: usageLogs.slice(-10).reverse(),
       activeUsers,
       weeklyUsage,
     });

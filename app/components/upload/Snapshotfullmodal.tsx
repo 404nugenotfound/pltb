@@ -10,6 +10,7 @@ interface SnapshotFullModalProps {
   pendingFilename: string;
   onContinueWithoutSnapshot: () => void;
   onDismiss: () => void;
+  onUpgrade: () => void;
 }
 
 export default function SnapshotFullModal({
@@ -20,6 +21,7 @@ export default function SnapshotFullModal({
   pendingFilename,
   onContinueWithoutSnapshot,
   onDismiss,
+  onUpgrade,
 }: SnapshotFullModalProps) {
   const router = useRouter();
 
@@ -154,6 +156,29 @@ export default function SnapshotFullModal({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
             </button>
+
+            {/* Opsi 3 — Upgrade Paket (hidden kalau tier === "business") */}
+            {tier !== "business" && (
+              <button
+                onClick={onUpgrade}
+                className="w-full flex items-center gap-3 p-3.5 rounded-xl border border-purple-200 bg-purple-50 hover:bg-purple-100 transition-colors group text-left"
+              >
+                <div className="w-8 h-8 rounded-lg bg-purple-500 flex items-center justify-center shrink-0">
+                  <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 3l14 9-14 9V3z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-purple-800">Upgrade Paket</p>
+                  <p className="text-xs text-purple-600 mt-0.5">
+                    Tambah slot snapshot dengan upgrade ke tier lebih tinggi
+                  </p>
+                </div>
+                <svg className="w-4 h-4 text-purple-400 group-hover:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* Footer — batalkan */}

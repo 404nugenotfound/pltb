@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PaymentCard from "@/app/components/payments/PaymentsCard";
 import PaymentModal from "@/app/components/payments/PaymentModal";
 
@@ -13,7 +13,6 @@ interface StorageInfo {
 
 interface UpgradeModalProps {
   storageInfo: StorageInfo;
-  paymentHistory: any[];
   onClose: () => void;
   onSuccess: () => Promise<void>;
 }
@@ -21,19 +20,29 @@ interface UpgradeModalProps {
 const TIER_ORDER = { free: 0, basic: 1, business: 2 };
 
 const TIERS = [
-  { key: "basic" as const,    label: "Basic",    storage_mb: "100.00 MB + 2 Cache",   harga: "Rp 2.000 / bulan"   },
-  { key: "business" as const, label: "Business", storage_mb: "2048.00 MB + 10 Cache",  harga: "Rp 599.000 / bulan" },
+  { key: "basic" as const,    label: "Basic",    storage_mb: "550.00 MB + 3 Cache",   harga: "Rp 299.000 / bulan"   },
+  { key: "business" as const, label: "Business", storage_mb: "2048.00 MB + 5 Cache",  harga: "Rp 599.000 / bulan" },
 ];
 
 export default function UpgradeModal({
   storageInfo,
-  paymentHistory,
   onClose,
   onSuccess,
 }: UpgradeModalProps) {
   const [selectedTier, setSelectedTier] = useState<"basic" | "business">("basic");
   const [paymentTier, setPaymentTier] = useState<"basic" | "business" | null>(null);
+  const [paymentHistory, setPaymentHistory] = useState<any[]>([]);  // ← tambah ini
 
+  // ← tambah ini
+  useEffect(() => {
+    const username = sessionStorage.getItem("ventara_username") || "";
+    if (!username) return;
+    fetch(`/api/payment/history?username=${username}`)
+      .then((r) => r.json())
+      .then((json) => { if (json.success) setPaymentHistory(json.data); })
+      .catch(() => {});
+  }, []);
+  
   function isTierOwned(tier: string) {
     return (
       TIER_ORDER[tier as keyof typeof TIER_ORDER] <=
@@ -117,7 +126,7 @@ export default function UpgradeModal({
           {isTierOwned(selectedTier)
             ? `${selectedTier.charAt(0).toUpperCase() + selectedTier.slice(1)} (Sudah Aktif)`
             : `Upgrade ke ${selectedTier} — ${
-                { basic: "Rp 2.000", business: "Rp 599.000" }[selectedTier]
+                { basic: "Rp 299.000", business: "Rp 599.000" }[selectedTier]
               }/bulan`}
         </button>
 
