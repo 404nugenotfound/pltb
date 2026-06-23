@@ -427,11 +427,14 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
         load_metrics_for_var,
         load_dl_metrics_for_var,
     )
+    
     from training.nlp import build_forecast_text, generate_nlp_report_best
     from training.feature_engineering import load_and_engineer
     from tensorflow.keras.models import load_model as _load
+    from utils.registry import compute_file_hash
     
     df = load_and_engineer(dataset_path, target_var=TARGET)
+    file_hash = compute_file_hash(dataset_path) if dataset_path and os.path.exists(dataset_path) else ""
     try:
         np.random.seed(42)
 
@@ -575,7 +578,7 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
             stacked_preds = decode_dl(np.concatenate(raw_all, axis=0))
 
             from training.metrics import save_ensemble_metrics
-            save_ensemble_metrics(var, "XGB", best_dl_name, train_metrics, test_metrics, username=username)
+            save_ensemble_metrics(var, "XGB", best_dl_name, train_metrics, test_metrics, file_hash=file_hash, username=username)
 
             ensemble_summary[var] = {
                 "ml": "XGB",

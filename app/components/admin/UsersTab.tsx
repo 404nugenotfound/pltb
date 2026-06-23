@@ -52,8 +52,6 @@ export const UsersTab = ({
               <tr className="border-b border-gray-100 bg-linear-to-r from-[#e6f6f4]/30 to-transparent cursor-default">
                 <th className="px-6 py-4 text-left text-xs font-semibold text-[#007f6d] uppercase tracking-wider">Username</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-[#007f6d] uppercase tracking-wider">Email</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-[#007f6d] uppercase tracking-wider">Lokasi</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-[#007f6d] uppercase tracking-wider">Terdaftar</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-[#007f6d] uppercase tracking-wider">Penggunaan</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-[#007f6d] uppercase tracking-wider">Status</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-[#007f6d] uppercase tracking-wider">Aksi</th>
@@ -87,8 +85,6 @@ export const UsersTab = ({
                       </div>
                     </td>
                     <td className="px-6 py-4 text-gray-500 text-sm cursor-default">{user.email}</td>
-                    <td className="px-6 py-4 text-gray-500 text-sm cursor-default">{user.location}</td>
-                    <td className="px-6 py-4 text-gray-400 text-xs font-mono cursor-default">{formatDate(user.registeredAt)}</td>
                     <td className="px-6 py-4 cursor-default">
                       <div className="flex flex-col">
                         <span className="text-sm font-semibold text-[#00a991]">{user.usageCount} kali</span>
