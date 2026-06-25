@@ -4,7 +4,7 @@ import { useState } from "react";
 import { User, Mail, Lock, Eye, EyeOff } from "lucide-react";
 
 import { Bebas_Neue } from "next/font/google";
-import { Poppins } from "next/font/google";
+import { poppins } from "@/app/fonts";
 
 interface Props {
   onRegister: (username: string, email: string, password: string) => void;
@@ -13,11 +13,6 @@ interface Props {
 
 const bebasNeue = Bebas_Neue({
   weight: "400",
-  subsets: ["latin"],
-});
-
-const poppins = Poppins({
-  weight: "500",
   subsets: ["latin"],
 });
 

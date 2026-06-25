@@ -8,7 +8,9 @@ interface SaveHistoryPayload {
   periode: string;
   nlp_report: string;
   forecast_data?: object | null;
-  onStorageFull?: () => void;  // ← callback
+  metrics?: object | null;
+  ensemble_components?: object | null;
+  onStorageFull?: () => void;
 }
 
 export function useSaveHistory() {
@@ -19,6 +21,8 @@ export function useSaveHistory() {
     periode,
     nlp_report,
     forecast_data,
+    metrics,
+    ensemble_components,
     onStorageFull,
   }: SaveHistoryPayload) => {
 
@@ -32,6 +36,8 @@ export function useSaveHistory() {
         status: "Selesai",
         nlp_report,
         forecast_data: forecast_data ?? null,
+        metrics: metrics ?? null,
+        ensemble_components: ensemble_components ?? null,
       };
 
       const username = sessionStorage.getItem("ventara_username");

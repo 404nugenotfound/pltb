@@ -16,6 +16,7 @@ interface GenerateContextValue {
     onDone?: (nlp: string, ensembleSummary: Record<string, any>) => void,
     selectedVar?: string
   ) => void;
+  cancelGenerate: () => Promise<void>;
 }
 
 const DEFAULT: GenerateState = {
@@ -31,11 +32,20 @@ const GenerateContext = createContext<GenerateContextValue | null>(null);
 export function GenerateProvider({ children }: { children: React.ReactNode }) {
   const [generate, setGenerate] = useState<GenerateState>(DEFAULT);
   const pollActive = useRef(false);
+  const pollGeneration = useRef(0); // ← tambah
+  const hasResumed = useRef(false); // ← tambah
+  // FIX: tambah flag untuk tahu apakah generate dipanggil manual
+  // sehingga useEffect resume tidak bentrok dengan startGenerate
+  const didStartManually = useRef(false);
+  const pollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const pollOnce = useCallback(async (
-    onDone?: (nlp: string, ensembleSummary: Record<string, any>) => void
+    onDone?: (nlp: string, ensembleSummary: Record<string, any>) => void,
+    generation?: number
   ) => {
-    if (!pollActive.current) return;
+    console.log("pollOnce called, pollActive:", pollActive.current); // ← tambah
+    const myGen = generation ?? pollGeneration.current;
+    if (!pollActive.current || myGen !== pollGeneration.current) return;
     try {
       const res = await fetch("/api/generate-progress");
       const prog = await res.json();
@@ -71,7 +81,7 @@ export function GenerateProvider({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      setTimeout(() => pollOnce(onDone), 1500);
+      pollTimer.current = setTimeout(() => pollOnce(onDone, myGen), 1500);
     } catch (err) {
       pollActive.current = false;
       setGenerate(DEFAULT);
@@ -79,16 +89,32 @@ export function GenerateProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  // ✅ Resume toast otomatis pas refresh — tanya BE dulu, bukan localStorage
+  // Resume toast otomatis saat refresh — tanya BE dulu, bukan localStorage
   useEffect(() => {
     const resume = async () => {
-      // Kalau pollActive udah true (startGenerate baru dipanggil), skip
+      // FIX: skip resume kalau startGenerate sudah dipanggil duluan
+      console.log("resume check, didStartManually:", didStartManually.current, "pollActive:", pollActive.current); // ← tambah
+      if (hasResumed.current) return;  // ← tambah
+      hasResumed.current = true;       // ← tambah
+      const wasCancelled = sessionStorage.getItem("ventara_cancelled") === "true"; // ← tambah
+      if (wasCancelled) { // ← tambah
+        sessionStorage.removeItem("ventara_cancelled"); // ← tambah
+        return; // ← tambah
+      } // ← tambah
+      if (didStartManually.current) return;
       if (pollActive.current) return;
+
       try {
         const res = await fetch("/api/generate-progress");
         const prog = await res.json();
-        // Hanya resume kalau BE konfirmasi masih running
+
         if (prog.running && !prog.done && !prog.error) {
+          // FIX: cek lagi setelah await, karena startGenerate mungkin
+          // sudah jalan selama fetch berlangsung (race condition)
+          if (pollActive.current) return;
+          if (didStartManually.current) return;
+          if (pollGeneration.current > 0) return; // ← tambah: kalau startGenerate sudah jalan duluan
+
           pollActive.current = true;
           setGenerate({
             visible: true,
@@ -111,6 +137,11 @@ export function GenerateProvider({ children }: { children: React.ReactNode }) {
     onDone?: (nlp: string, ensembleSummary: Record<string, any>) => void,
     selectedVar: string = "WS10M",
   ) => {
+    // FIX: tandai bahwa generate dipanggil manual supaya resume di useEffect
+    // tidak ikut jalan dan menyebabkan dua pollOnce berjalan bersamaan
+    console.log("startGenerate called"); // ← tambah
+    didStartManually.current = true;
+    sessionStorage.removeItem("ventara_cancelled"); // ← tambah
     console.log("selectedVar dikirim:", selectedVar);
     setGenerate({ ...DEFAULT, visible: true });
     try {
@@ -133,8 +164,34 @@ export function GenerateProvider({ children }: { children: React.ReactNode }) {
     }
   }, [pollOnce]);
 
+  const cancelGenerate = useCallback(async () => {
+    pollActive.current = false;
+    const username = sessionStorage.getItem("ventara_username") || "";
+    sessionStorage.setItem("ventara_cancelled", "true"); // ← tambah
+    if (pollTimer.current) {
+      clearTimeout(pollTimer.current);
+      pollTimer.current = null;
+    }
+    didStartManually.current = false;
+    try {
+      await fetch(`/api/cancel-generate?username=${username}`, { method: "POST" });
+
+      // Tunggu BE konfirmasi berhenti, max 10 detik
+      for (let i = 0; i < 10; i++) {
+        await new Promise(r => setTimeout(r, 500));
+        const res = await fetch("/api/generate-progress");
+        const prog = await res.json();
+        if (!prog.running || prog.done || prog.error) break;
+      }
+    } catch (e) {
+      console.error("Cancel generate failed:", e);
+    } finally {
+      setGenerate(DEFAULT);
+    }
+  }, []);
+
   return (
-    <GenerateContext.Provider value={{ generate, startGenerate }}>
+    <GenerateContext.Provider value={{ generate, startGenerate, cancelGenerate }}>
       {children}
     </GenerateContext.Provider>
   );

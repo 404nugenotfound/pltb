@@ -44,16 +44,16 @@ export interface ForecastData {
 const actualColorMap: Record<string, string> = {
   WS10M: "rgba(107,114,128,0.9)",
   WD10M: "rgba(156,163,175,0.9)",
-  RH2M:  "rgba(75,85,99,0.9)",
+  RH2M: "rgba(75,85,99,0.9)",
 };
 
 const paletteColors = ["#14b8a6", "#3b82f6", "#f59e0b"];
 
 const colorMap: Record<string, string> = {
-  GBR:    "#14b8a6",
-  XGB:    "#3b82f6",
-  KNN:    "#f59e0b",
-  LSTM:   "#8b5cf6",
+  GBR: "#14b8a6",
+  XGB: "#3b82f6",
+  KNN: "#f59e0b",
+  LSTM: "#8b5cf6",
   BiLSTM: "#ec4899",
 };
 
@@ -61,55 +61,59 @@ export default function ForecastChart({
   mode = "general",
   varParam = "WS10M",
   onVarChange,
-  initialData,    // ← tambah
-  onDataLoaded,   // ← tambah
+  initialData, // ← tambah
+  onDataLoaded, // ← tambah
 }: Props) {
   const [selectedModel, setSelectedModel] = useState("GBR");
-  const [localVar, setLocalVar]           = useState(varParam);
-  const [data, setData]                   = useState<ForecastData | null>(null);
-  const [loading, setLoading]             = useState(true);
-  const [error, setError]                 = useState<string | null>(null);
+  const [localVar, setLocalVar] = useState(varParam);
+  const [data, setData] = useState<ForecastData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // sync localVar kalau varParam dari parent berubah
   useEffect(() => {
     setLocalVar(varParam);
   }, [varParam]);
 
-
+  // tambah effect terpisah khusus initialData
   useEffect(() => {
-  if (initialData) {
+    if (!initialData) return;
     setData(initialData as ForecastData);
     const firstModel = Object.keys(initialData.predictions)[0];
     if (firstModel) setSelectedModel(firstModel);
     setLoading(false);
-    return; // skip fetch
-  }
+  }, [initialData]);
 
-  const fetchData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`http://localhost:5000/forecast_result?mode=${mode}&var=${localVar}`, {
-        credentials: "include",
-      });
-      const json = await res.json();
-      if (json.error) {
-        setError(json.error);
-      } else {
-        setData(json);
-        onDataLoaded?.(json); // ← tambah
-        const firstModel = Object.keys(json.predictions)[0];
-        if (firstModel) setSelectedModel(firstModel);
+  // effect fetch — skip kalau initialData ada
+  useEffect(() => {
+    if (initialData) return;
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await fetch(
+          `http://localhost:5000/forecast_result?mode=${mode}&var=${localVar}`,
+          {
+            credentials: "include",
+          },
+        );
+        const json = await res.json();
+        if (json.error) {
+          setError(json.error);
+        } else {
+          setData(json);
+          onDataLoaded?.(json);
+          const firstModel = Object.keys(json.predictions)[0];
+          if (firstModel) setSelectedModel(firstModel);
+        }
+      } catch {
+        setError("Gagal mengambil data dari server.");
+      } finally {
+        setLoading(false);
       }
-    } catch {
-      setError("Gagal mengambil data dari server.");
-    } finally {
-      setLoading(false);
-    }
-  };
-  fetchData();
-}, [mode, localVar, initialData]);
-
+    };
+    fetchData();
+  }, [mode, localVar]);
 
   const handleVarChange = (v: string) => {
     setLocalVar(v);
@@ -123,37 +127,44 @@ export default function ForecastChart({
         labels: data.labels,
         datasets: [
           ...(mode === "general" && data.actual.length > 0
-            ? [{
-                label: "Aktual",
-                data: data.actual,
-                borderColor: "rgba(107,114,128,0.9)",
-                borderDash: [10, 6] as number[],
-                borderWidth: 2,
-                tension: 0.4,
-                pointRadius: 0,
-              }]
+            ? [
+                {
+                  label: "Aktual",
+                  data: data.actual,
+                  borderColor: "rgba(107,114,128,0.9)",
+                  borderDash: [10, 6] as number[],
+                  borderWidth: 2,
+                  tension: 0.4,
+                  pointRadius: 0,
+                },
+              ]
             : []),
           ...(mode === "general"
-            ? [{
-                label: selectedModel,
-                data: data.predictions[selectedModel] ?? [],
-                borderColor: colorMap[selectedModel] ?? "#14b8a6",
-                borderWidth: 2,
-                tension: 0.4,
-                pointRadius: 0,
-              }]
+            ? [
+                {
+                  label: selectedModel,
+                  data: data.predictions[selectedModel] ?? [],
+                  borderColor: colorMap[selectedModel] ?? "#14b8a6",
+                  borderWidth: 2,
+                  tension: 0.4,
+                  pointRadius: 0,
+                },
+              ]
             : [
                 // aktual untuk var yang dipilih saja
                 ...(data.actual_dict?.[localVar]
-                  ? [{
-                      label: `Aktual ${localVar}`,
-                      data: data.actual_dict[localVar],
-                      borderColor: actualColorMap[localVar] ?? "rgba(107,114,128,0.9)",
-                      borderDash: [10, 6] as number[],
-                      borderWidth: 2,
-                      tension: 0.4,
-                      pointRadius: 0,
-                    }]
+                  ? [
+                      {
+                        label: `Aktual ${localVar}`,
+                        data: data.actual_dict[localVar],
+                        borderColor:
+                          actualColorMap[localVar] ?? "rgba(107,114,128,0.9)",
+                        borderDash: [10, 6] as number[],
+                        borderWidth: 2,
+                        tension: 0.4,
+                        pointRadius: 0,
+                      },
+                    ]
                   : []),
                 // ensemble untuk var yang dipilih saja
                 ...Object.entries(data.predictions)
@@ -166,8 +177,7 @@ export default function ForecastChart({
                     tension: 0.4,
                     pointRadius: 0,
                   })),
-              ]
-          ),
+              ]),
         ],
       }
     : { labels: [], datasets: [] };
@@ -196,7 +206,9 @@ export default function ForecastChart({
           >
             {availableModels.length > 0 ? (
               availableModels.map((m) => (
-                <option key={m} value={m}>{m}</option>
+                <option key={m} value={m}>
+                  {m}
+                </option>
               ))
             ) : (
               <>
@@ -240,7 +252,9 @@ export default function ForecastChart({
             <div className="flex flex-col items-center gap-2 text-center">
               <span className="text-2xl">📭</span>
               <p className="text-sm text-gray-500 font-medium">{error}</p>
-              <p className="text-xs text-gray-400">Jalankan proses generate terlebih dahulu.</p>
+              <p className="text-xs text-gray-400">
+                Jalankan proses generate terlebih dahulu.
+              </p>
             </div>
           </div>
         )}
@@ -279,7 +293,11 @@ export default function ForecastChart({
               scales: {
                 x: {
                   grid: { display: false },
-                  ticks: { maxTicksLimit: 10, maxRotation: 45, font: { size: 10 } },
+                  ticks: {
+                    maxTicksLimit: 10,
+                    maxRotation: 45,
+                    font: { size: 10 },
+                  },
                 },
                 y: {
                   grid: { color: "rgba(0,0,0,0.05)" },
@@ -294,7 +312,9 @@ export default function ForecastChart({
       {!loading && !error && data && (
         <div className="mt-3 flex items-center gap-2 text-xs text-gray-400">
           <div className="w-4 h-3 rounded-sm bg-teal-500/10 border border-teal-400/40" />
-          <span>Area berbayang = zona prediksi ke depan (168 jam / 7 hari)</span>
+          <span>
+            Area berbayang = zona prediksi ke depan (168 jam / 7 hari)
+          </span>
         </div>
       )}
     </div>

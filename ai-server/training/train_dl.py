@@ -106,7 +106,10 @@ def train_dl_models(df, target_var: str = None, cancel_check=None, username=""):
                 callbacks=callbacks,
                 verbose=1
             )
-            model.save(save_path(f"{name}{suffix}.h5"))  # ✅ per-user
+            if cancel_check and cancel_check():
+                print(f"🛑 Cancel detected setelah {name}, skip save")
+                raise InterruptedError(f"Training {name} dibatalkan")
+            model.save(save_path(f"{name}{suffix}.h5"))
             print(f"✅ {name}{suffix} disimpan")
 
         lstm = Sequential([
@@ -143,6 +146,8 @@ def train_dl_models(df, target_var: str = None, cancel_check=None, username=""):
             callbacks.append(CancelCallback(cancel_check))
 
         bilstm.compile(optimizer="adam", loss="mse")
+        if cancel_check and cancel_check():
+            raise InterruptedError("Training BiLSTM dibatalkan sebelum mulai")
         bilstm.fit(
             X_train, y_train,
             validation_data=(X_val, y_val),
@@ -151,8 +156,9 @@ def train_dl_models(df, target_var: str = None, cancel_check=None, username=""):
             callbacks=callbacks,
             verbose=1
         )
-        bilstm.save(save_path(f"bilstm{suffix}.h5"))  # ✅ per-user
-        print(f"✅ bilstm{suffix} disimpan")
+        if cancel_check and cancel_check():
+            raise InterruptedError("Training BiLSTM dibatalkan")
+        bilstm.save(save_path(f"bilstm{suffix}.h5"))
 
         # =========================
         # SIMPAN SCALER & METADATA
@@ -166,6 +172,8 @@ def train_dl_models(df, target_var: str = None, cancel_check=None, username=""):
         print(f"✅ DL training selesai untuk {target_var}")
         return True
 
+    except InterruptedError:
+        raise
     except Exception as e:
         print(f"⚠️ DL training gagal untuk {target_var}: {e}")
         traceback.print_exc()

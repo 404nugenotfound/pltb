@@ -96,8 +96,17 @@ def _worker_generate_full(
     from training.feature_engineering import load_and_engineer
 
     df = load_and_engineer(dataset_path, target_var=TARGET)
+    with progress_lock:
+        if generate_progress.get(username, {}).get("cancel"):
+            generate_progress[username].update({"running": False, "done": True, "error": "Dibatalkan user"})
+            return
+
     # ✅ Load model per variabel
     gbr, xgb, knn, scaler, FEATURES = load_ml_for_var(selected_var, username=username)
+    with progress_lock:
+        if generate_progress.get(username, {}).get("cancel"):
+            generate_progress[username].update({"running": False, "done": True, "error": "Dibatalkan user"})
+            return
     print("ML FEATURES =", FEATURES)
     ML_READY = all(
         [
@@ -114,6 +123,10 @@ def _worker_generate_full(
     X = np.array(df_var[FEATURES].values) if ML_READY else np.array([])
 
     dl_state = load_dl_for_var(df_var, selected_var, username=username)
+    with progress_lock:
+        if generate_progress.get(username, {}).get("cancel"):
+            generate_progress[username].update({"running": False, "done": True, "error": "Dibatalkan user"})
+            return
     DL_READY = dl_state["DL_READY"]
     lstm = dl_state["lstm"]
     bilstm = dl_state["bilstm"]
@@ -129,9 +142,12 @@ def _worker_generate_full(
         else:
             return scaler_y.inverse_transform(raw).flatten()
 
+    from utils.registry import compute_file_hash
+    file_hash = compute_file_hash(dataset_path) if dataset_path and os.path.exists(dataset_path) else ""
+
     # ✅ Load metrics per variabel
-    metrics = load_metrics_for_var(selected_var, username=username)
-    metrics_dl = load_dl_metrics_for_var(selected_var, username=username)
+    metrics = load_metrics_for_var(selected_var, file_hash=file_hash, username=username)
+    metrics_dl = load_dl_metrics_for_var(selected_var, file_hash=file_hash, username=username)
 
     print("=" * 50)
     print("🚀 WORKER FULL START")
@@ -192,7 +208,13 @@ def _worker_generate_full(
         history_window = df_var.tail(STEP).copy().reset_index(drop=True)
         future_rows = []
         
-        lo, hi = {"WS10M": (0, 50), "RH2M": (0, 100), "WD10M": (0, 360)}.get(selected_var, (None, None))    
+        lo, hi = {"WS10M": (0, 50), "RH2M": (0, 100), "WD10M": (0, 360)}.get(selected_var, (None, None)) 
+        with progress_lock:
+            if generate_progress.get(username, {}).get("cancel"):
+                generate_progress[username].update(
+                    {"running": False, "done": True, "error": "Dibatalkan user"}
+                )
+                return   
         for i in range(future_steps):
             with progress_lock:
                 if generate_progress.get(username, {}).get("cancel"):
@@ -368,7 +390,7 @@ def _worker_generate_full(
             )
             best_name = list(all_metrics_var.keys())[0] if all_metrics_var else "GBR"
 
-        nlp_report = generate_nlp_report(stats, best_name, all_metrics_var[best_name])
+        nlp_report = generate_nlp_report(stats, best_name, all_metrics_var[best_name], var=selected_var)
 
         base_cols = ["YEAR", "MO", "DY", "HR", selected_var]
         pred_cols = [
@@ -466,6 +488,12 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
             gbr, xgb, knn, scaler, FEATURES = load_ml_for_var(var, username=username)
             df_var = load_and_engineer(dataset_path, target_var=var)
             dl_state = load_dl_for_var(df_var, var, username=username)
+            
+            with progress_lock:
+                if generate_progress.get(username, {}).get("cancel"):
+                    generate_progress[username].update({"running": False, "done": True, "error": "Dibatalkan user"})
+                    return
+                
             DL_READY = dl_state["DL_READY"]
             scaler_X = dl_state["scaler_X"]
             scaler_y = dl_state["scaler_y"]
@@ -482,8 +510,8 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
                 print(f"⚠️ DL {var} tidak siap, skip")
                 continue
 
-            metrics_var = load_metrics_for_var(var, username=username)
-            metrics_dl_var = load_dl_metrics_for_var(var, username=username)
+            metrics_var = load_metrics_for_var(var, file_hash=file_hash, username=username)
+            metrics_dl_var = load_dl_metrics_for_var(var, file_hash=file_hash, username=username)
 
             best_dl_name = (
                 min(
@@ -510,6 +538,10 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
 
 
             _lstm = _load(os.path.join(user_model_dir, dl_filename))
+            with progress_lock:
+                if generate_progress.get(username, {}).get("cancel"):
+                    generate_progress[username].update({"running": False, "done": True, "error": "Dibatalkan user"})
+                    return
             _dl_cols = (
                 DL_INPUT_COLS
                 if DL_INPUT_COLS
@@ -604,7 +636,13 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
             lo, hi = {"WS10M": (0, 50), "RH2M": (0, 100), "WD10M": (0, 360)}.get(
                 var, (None, None)
             )
-
+            
+            with progress_lock:
+                if generate_progress.get(username, {}).get("cancel"):
+                    generate_progress[username].update(
+                        {"running": False, "done": True, "error": "Dibatalkan user"}
+                    )
+                    return   
             for i in range(future_steps):
                 with progress_lock:
                     if generate_progress.get(username, {}).get("cancel"):
@@ -864,9 +902,11 @@ def generate_full():
         }
 
     selected_model = request.form.get("model", "all")
+    from utils.registry import compute_file_hash
+    file_hash = compute_file_hash(dataset_path) if dataset_path and os.path.exists(dataset_path) else ""
 
-    metrics_var = load_metrics_for_var(selected_var, username=username)
-    metrics_dl_var = load_dl_metrics_for_var(selected_var, username=username)
+    metrics_var = load_metrics_for_var(selected_var, file_hash=file_hash, username=username)
+    metrics_dl_var = load_dl_metrics_for_var(selected_var, file_hash=file_hash, username=username)
     all_models = list(metrics_var.keys()) + list(metrics_dl_var.keys())
 
     active_models = (
@@ -892,8 +932,10 @@ def generate_best():
     username = request.headers.get("X-Username") or session.get("username")
     if not username:
         return jsonify({"status": "error", "message": "Unauthorized"}), 401
+    from utils.registry import compute_file_hash
 
     dataset_path = get_active_dataset_path_for_user(username=username)
+    file_hash = compute_file_hash(dataset_path) if dataset_path and os.path.exists(dataset_path) else ""
 
     with progress_lock:
         if generate_progress.get(username, {}).get("running"):
@@ -911,7 +953,7 @@ def generate_best():
             "cancel": False,
         }
 
-    any_ready = any(load_metrics_for_var(var, username=username) for var in TRAIN_VARS)
+    any_ready = any(load_metrics_for_var(var, file_hash=file_hash, username=username) for var in TRAIN_VARS)
     if not any_ready:
         with progress_lock:
             generate_progress[username].update({"running": False, "done": True})

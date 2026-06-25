@@ -1,17 +1,13 @@
 "use client";
 
 import { Bebas_Neue } from "next/font/google";
-import { Poppins } from "next/font/google";
+import { poppins } from "@/app/fonts";
 
 const bebasNeue = Bebas_Neue({
   weight: "400",
   subsets: ["latin"],
 });
 
-const poppins = Poppins({
-  weight: "500",
-  subsets: ["latin"],
-});
 
 interface Props {
   onStart: () => void;

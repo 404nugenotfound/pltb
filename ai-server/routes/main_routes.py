@@ -9,11 +9,7 @@ from config import *
 from utils.cache import *
 from utils.dataset import (
     get_active_dataset_path_for_user,       # ← tambah
-    allowed_file
 )
-from utils.progress import generate_progress, progress_lock
-
-from training.metrics import load_metrics, load_ensemble_metrics
 
 from training.nlp import *
 
@@ -83,39 +79,7 @@ def forecasting_data():
         "ensemble_summary": ensemble_summary,
     })
     
-# =========================
-# ANALITIK
-# =========================
-@main_bp.route("/analitik")
-def analitik():
-
-    return render_template(
-        "analitik.html"
-    )
-
-
-# =========================
-# UNDER MAINTENANCE
-# =========================
-@main_bp.route("/underMaintenance")
-def underMaintenance():
-
-    return render_template(
-        "underMaintenance.html"
-    )
-
-
-# =========================
-# DASHBOARD
-# =========================
-@main_bp.route("/dashboard")
-def dashboard():
-
-    return render_template(
-        "dashboard.html"
-    )
-
-
+    
 # =========================
 # RESET NLP
 # =========================
@@ -323,17 +287,16 @@ def forecast_result():
         pred_cols   = [c for c in df_show.columns if c not in skip_cols]
 
         # Filter pred_cols sesuai var kalau general
+        actual_dict = {}  # ← definisiin di luar dulu
         if mode == "general":
             pred_cols = [c for c in ["GBR", "XGB", "KNN", "LSTM", "BiLSTM"] if c in df_show.columns]
         else:  # best
             all_vars = {"WS10M", "WD10M", "RH2M"}
             skip_cols = {"YEAR", "MO", "DY", "HR", "label"} | all_vars
-            # hanya ambil kolom ensemble (bukan _Base)
             pred_cols = [
                 c for c in df_show.columns
                 if c not in skip_cols and "_Base_" not in c
             ]
-            # actual: dict per atribut
             actual_dict = {
                 v: df_show[v].tolist()
                 for v in all_vars

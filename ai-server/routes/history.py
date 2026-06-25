@@ -56,14 +56,6 @@ def save_history():
             if os.path.exists(candidate):
                 csv_paths.add(candidate)
 
-    # tambah CSV dari entry baru
-    new_entry = data.get("entry", data)
-    new_file = new_entry.get("file", "")
-    if new_file:
-        candidate = os.path.join(UPLOAD_FOLDER, new_file)
-        if os.path.exists(candidate) and candidate not in csv_paths:
-            csv_paths.add(candidate)
-
     csv_size = sum(os.path.getsize(p) for p in csv_paths)
     current_usage = history_size + csv_size
     new_entry_size = len(json.dumps(data).encode("utf-8"))
@@ -81,7 +73,7 @@ def save_history():
     if "history" not in user:
         user["history"] = []
 
-    user["history"].insert(0, data)
+    user["history"].insert(0, {"entry": data.get("entry", data)})
     save_user(user)
 
     return jsonify({"success": True, "message": "History saved"})
@@ -126,19 +118,15 @@ def storage_info():
     from utils.dataset import get_active_dataset_path_for_user
 
     username = get_username()
-    print("USERNAME =", username)
 
     if not username:
         return jsonify({"success": False}), 401
 
     user = load_user(username)
-    print("USER =", user)
 
     # TAMBAH INI
     import json
-    print("USER DETAIL =")
-    print(json.dumps(user, indent=2))
-    
+
     if not user:
         return jsonify({"success": False}), 404
 
@@ -183,7 +171,7 @@ def storage_info():
     # hash cache count
     hash_count = len(user.get("snapshots", []))
 
-    usage = history_size + csv_size + model_size
+    usage = history_size + csv_size 
 
     print("HISTORY COUNT =", len(user.get("history", [])))
     print("HISTORY SIZE =", history_size)
@@ -264,3 +252,40 @@ def delete_history():
     save_user(user)
 
     return jsonify({"success": True})
+
+# =========================
+# DOWNLOAD CSV
+# =========================
+@history_bp.route("/download_history_csv", methods=["GET"])
+def download_history_csv():
+    from flask import send_file
+    
+    username = get_username()
+    if not username:
+        return jsonify({"success": False}), 401
+
+    filename = request.args.get("file")
+    if not filename:
+        return jsonify({"success": False, "message": "Filename required"}), 400
+
+    # ✅ Validasi — file harus ada di history user ini
+    from utils.user_helpers import load_user
+    user = load_user(username)
+    if not user:
+        return jsonify({"success": False}), 404
+
+    history_files = set()
+    for item in user.get("history", []):
+        entry = item.get("entry", item)
+        f = entry.get("file", "")
+        if f:
+            history_files.add(f)
+
+    if filename not in history_files:
+        return jsonify({"success": False, "message": "Akses ditolak"}), 403
+
+    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    if not os.path.exists(filepath):
+        return jsonify({"success": False, "message": "File tidak ditemukan"}), 404
+
+    return send_file(filepath, as_attachment=True, download_name=filename)

@@ -1,0 +1,16 @@
+{
+  "username": "kufaku",
+  "email": "kufaku@gmaill.com",
+  "password": "kufaku",
+  "role": "user",
+  "name": "kufaku",
+  "location": "Unknown",
+  "active_dataset": "C:\\xampp\\htdocs\\pltb-brin\\ai-server\\uploads\\NASA_Baron_Hourly.csv",
+  "usage_logs": [
+    {
+      "id": "e39c953b",
+      "feature": "training",
+      "timestamp": "2026-06-24T19:37:04.025634"
+    }
+  ]
+}

@@ -194,7 +194,7 @@ def _classify_location(stats_per_var: dict) -> tuple[str, str]:
         )
 
 
-def generate_nlp_report(stats: dict, best_model_name: str, best_met: dict) -> str:
+def generate_nlp_report(stats: dict, best_model_name: str, best_met: dict, var: str = "") -> str:
     smape_raw = (
         str(best_met.get("sMAPE", "-")).replace(",", ".").replace("%", "").strip()
     )
@@ -329,7 +329,7 @@ def generate_nlp_report(stats: dict, best_model_name: str, best_met: dict) -> st
         )
 
     return (
-        f"Ringkasan prediksi {nama} untuk periode "
+        f"Ringkasan prediksi {nama} ({var}) untuk periode "
         f"{stats['start_date']} hingga {stats['end_date']}:\n"
         f"\n"
         f"\u25b8 Statistik: rata-rata {stats['avg']:.2f} {satuan} ({stats['category']}), "

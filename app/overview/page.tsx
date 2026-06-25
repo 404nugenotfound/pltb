@@ -86,6 +86,17 @@ export default function OverviewPage() {
     const savedMode = sessionStorage.getItem(
       `ventara_generate_mode_${username}`,
     );
+    const fromHistory = sessionStorage.getItem(
+      `ventara_from_history_${username}`,
+    );
+
+    // kalau bukan dari history, clear overfit cache biar fetch fresh dari Flask
+    if (!fromHistory) {
+      sessionStorage.removeItem(`ventara_overfit_metrics_${username}`);
+      sessionStorage.removeItem(`ventara_ensemble_components_${username}`);
+    }
+    // reset flag
+    sessionStorage.removeItem(`ventara_from_history_${username}`);
     const savedVar = sessionStorage.getItem(`ventara_active_var_${username}`);
     const savedForecast = sessionStorage.getItem(
       `ventara_forecast_data_${username}`,

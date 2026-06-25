@@ -6,7 +6,6 @@ import Sidebar from "@/app/components/layout/Sidebar";
 import Header from "@/app/components/layout/Header";
 import UploadState from "@/app/components/upload/UploadState";
 import MetricsSection from "@/app/components/metrics/MetricsSection";
-import ProgressToast from "@/app/components/toast/ProgressToast";
 import { useMetrics } from "@/app/hooks/useMetrics";
 import { useEffect, useState } from "react";
 import { useGenerateContext } from "@/app/context/GenerateContext";
@@ -368,15 +367,6 @@ export default function ForecastingPage() {
           </div>
         </div>
       </main>
-
-      {/* TOAST */}
-      <ProgressToast
-        visible={generate.visible}
-        percent={generate.percent}
-        status={generate.status}
-        eta={generate.eta}
-        elapsed={generate.elapsed}
-      />
 
       {guideOpen && (
         <>

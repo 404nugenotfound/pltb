@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { User, Mail, Lock, Eye, EyeOff } from "lucide-react";
 
 import { Bebas_Neue } from "next/font/google";
-import { Poppins } from "next/font/google";
+import { poppins } from "@/app/fonts";
 
 import ReCAPTCHA from "react-google-recaptcha";
 
@@ -20,11 +20,6 @@ interface Props {
 
 const bebasNeue = Bebas_Neue({
   weight: "400",
-  subsets: ["latin"],
-});
-
-const poppins = Poppins({
-  weight: "500",
   subsets: ["latin"],
 });
 

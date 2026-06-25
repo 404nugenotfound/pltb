@@ -113,9 +113,16 @@ def restore_snapshot_route(snapshot_id):
         return jsonify({"success": False, "message": "User not found."}), 404
 
     # ✅ Update metrics di user JSON DULU — pakai data dari registry LOKAL
-    user["metrics"] = registry.get("metrics", {})
-    save_user(user)
+    snapshot_hash = registry.get("hash", "")
+    raw_metrics = registry.get("metrics", {})
+    wrapped_metrics = {}
+    for var_name, var_data in raw_metrics.items():
+        wrapped_metrics[var_name] = {
+            snapshot_hash: var_data
+        }
 
+    user["metrics"] = wrapped_metrics
+    save_user(user)
     # Update active_dataset ke dataset dari registry LOKAL, lalu reload globals
     from utils.dataset import set_active_dataset_path_for_user
     from config import UPLOAD_FOLDER

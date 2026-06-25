@@ -209,6 +209,38 @@ export default function OverfitChart({
   };
 
   useEffect(() => {
+    const username = sessionStorage.getItem("ventara_username");
+    const cached = sessionStorage.getItem(
+      `ventara_overfit_metrics_${username}`,
+    );
+    const cachedComponents = sessionStorage.getItem(
+      `ventara_ensemble_components_${username}`,
+    );
+
+    if (cached) {
+      try {
+        const metrics = JSON.parse(cached);
+        const components = cachedComponents ? JSON.parse(cachedComponents) : {};
+        // sama seperti handler fetch
+        setData(metrics);
+        setEnsembleComponents(components);
+        const firstVar =
+          selectedVarProp && metrics[selectedVarProp]
+            ? selectedVarProp
+            : (VAR_ORDER.find((v) => metrics[v]) ??
+              Object.keys(metrics)[0] ??
+              "");
+        const firstModel =
+          modelMemory.current[firstVar] ??
+          Object.keys(metrics[firstVar] ?? {}).find((m) => !m.includes("+")) ??
+          "";
+        setSelectedVar(firstVar);
+        setSelectedModelWithMemory(firstVar, firstModel);
+        setLoading(false);
+        return;
+      } catch {}
+    }
+
     fetch("http://localhost:5000/overfit_metrics", { credentials: "include" })
       .then((r) => r.json())
       .then((json) => {

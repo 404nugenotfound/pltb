@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useSaveHistory } from "@/app/hooks/useSaveHistory";
-import type { ForecastData } from "@/app/components/overview/ForecastChart";
 
 interface Props {
   datasetName: string;
@@ -40,16 +39,34 @@ export default function OverviewHeader({
         {/* RIGHT */}
         <div className="flex gap-3 items-center">
           <button
-            onClick={() =>
+            onClick={async () => {
+              const username = sessionStorage.getItem("ventara_username") || "";
+              let metrics = null;
+              let ensemble_components = null;
+              try {
+                const res = await fetch(
+                  "http://localhost:5000/overfit_metrics",
+                  {
+                    credentials: "include",
+                    headers: { "X-Username": username },
+                  },
+                );
+                const json = await res.json();
+                metrics = json.metrics ?? json;
+                ensemble_components = json.ensemble_components ?? null;
+              } catch {}
+
               saveHistory({
                 file: datasetName,
                 algo: generateMode === "best" ? "Best" : "General Model",
                 periode: "168 Jam",
                 nlp_report: nlpReport,
                 forecast_data: forecastData ?? null,
+                metrics,
+                ensemble_components,
                 onStorageFull: () => setShowUpgradeModal(true),
-              })
-            }
+              });
+            }}
             className="bg-teal-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-teal-700 transition cursor-pointer"
           >
             Simpan ke Historis
