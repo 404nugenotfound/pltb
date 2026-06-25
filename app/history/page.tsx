@@ -117,6 +117,7 @@ export default function HistorisPage() {
         method: "DELETE",
       });
       setData((prev) => prev.filter((d) => d.id !== id));
+      await refreshStorage(); // ← tambah
     } catch (error) {
       console.error("Failed to delete:", error);
     } finally {
@@ -318,15 +319,24 @@ export default function HistorisPage() {
                                   `ventara_nlp_report_${username}`,
                                   row.nlp_report || "",
                                 );
-                                sessionStorage.setItem(
-                                  `ventara_generate_mode_${username}`,
-                                  row.algo === "Best Model"
+                                const historyMode =
+                                  row.algo === "Best Model" ||
+                                  row.algo === "Best"
                                     ? "best"
-                                    : "general",
-                                );
+                                    : "general";
+                                const forecastWithMode = row.forecast_data
+                                  ? {
+                                      ...(row.forecast_data as object),
+                                      mode: historyMode,
+                                    }
+                                  : null;
                                 sessionStorage.setItem(
                                   `ventara_forecast_data_${username}`,
-                                  JSON.stringify(row.forecast_data ?? null),
+                                  JSON.stringify(forecastWithMode),
+                                );
+                                sessionStorage.setItem(
+                                  `ventara_generate_mode_${username}`,
+                                  historyMode,
                                 );
                                 sessionStorage.setItem(
                                   `ventara_overfit_metrics_${username}`,
@@ -338,8 +348,10 @@ export default function HistorisPage() {
                                     row.ensemble_components ?? null,
                                   ),
                                 );
-                                sessionStorage.setItem(`ventara_from_history_${username}`, "1");
-                                window.location.href = "/overview";
+                                sessionStorage.removeItem(
+                                  `ventara_ensemble_summary_${username}`,
+                                );
+                                window.location.href = "/overview?from=history";
                               }}
                               className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 text-gray-400 hover:text-blue-600 hover:bg-blue-50 hover:border-blue-200 transition-colors cursor-pointer"
                               title="Lihat detail"

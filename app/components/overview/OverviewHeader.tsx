@@ -1,12 +1,14 @@
 import Link from "next/link";
 import { useState } from "react";
 import { useSaveHistory } from "@/app/hooks/useSaveHistory";
+import { useStorage } from "@/app/context/StorageContext";
 
 interface Props {
   datasetName: string;
   generateMode: "general" | "best";
   nlpReport: string;
   forecastData?: object | null;
+  fromHistory?: boolean; // ← tambah
 }
 
 export default function OverviewHeader({
@@ -14,8 +16,10 @@ export default function OverviewHeader({
   generateMode,
   nlpReport,
   forecastData,
+  fromHistory, // ← tambah
 }: Props) {
   const { saveHistory } = useSaveHistory();
+  const { refreshStorage } = useStorage(); // ← tambah
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   return (
@@ -30,53 +34,65 @@ export default function OverviewHeader({
             Hasil tampilan secara keseluruhan dari proses
           </p>
           <Link
-            href="/forecasting"
+            href={fromHistory ? "/history" : "/forecasting"}
             className="text-md font-bold font-italic text-teal-600 hover:text-teal-800 hover:underline transition mt-1 inline-block"
           >
-            ← Kembali ke Forecasting
+            {fromHistory ? "← Kembali ke History" : "← Kembali ke Forecasting"}
           </Link>
         </div>
         {/* RIGHT */}
         <div className="flex gap-3 items-center">
-          <button
-            onClick={async () => {
-              const username = sessionStorage.getItem("ventara_username") || "";
-              let metrics = null;
-              let ensemble_components = null;
-              try {
-                const res = await fetch(
-                  "http://localhost:5000/overfit_metrics",
-                  {
-                    credentials: "include",
-                    headers: { "X-Username": username },
-                  },
-                );
-                const json = await res.json();
-                metrics = json.metrics ?? json;
-                ensemble_components = json.ensemble_components ?? null;
-              } catch {}
+          {!fromHistory && (
+            <button
+              onClick={async () => {
+                const username =
+                  sessionStorage.getItem("ventara_username") || "";
+                let metrics = null;
+                let ensemble_components = null;
+                try {
+                  const res = await fetch(
+                    "http://localhost:5000/overfit_metrics",
+                    {
+                      credentials: "include",
+                      headers: { "X-Username": username },
+                    },
+                  );
+                  const json = await res.json();
+                  metrics = json.metrics ?? json;
+                  ensemble_components = json.ensemble_components ?? null;
+                } catch {}
 
-              saveHistory({
-                file: datasetName,
-                algo: generateMode === "best" ? "Best" : "General Model",
-                periode: "168 Jam",
-                nlp_report: nlpReport,
-                forecast_data: forecastData ?? null,
-                metrics,
-                ensemble_components,
-                onStorageFull: () => setShowUpgradeModal(true),
-              });
-            }}
-            className="bg-teal-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-teal-700 transition cursor-pointer"
-          >
-            Simpan ke Historis
-          </button>
-          <Link
-            href="/history"
-            className="flex items-center gap-3 bg-gray-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-600 transition cursor-pointer"
-          >
-            <span>Page Data Histories</span>
-          </Link>
+                const outputFile =
+                  datasetName ||
+                  (generateMode === "best"
+                    ? `${username}_hasil_prediksi_best.csv`
+                    : `${username}_hasil_prediksi_general.csv`);
+
+                saveHistory({
+                  file: outputFile,
+                  algo: generateMode === "best" ? "Best" : "General Model",
+                  periode: "168 Jam",
+                  nlp_report: nlpReport,
+                  forecast_data: forecastData ?? null,
+                  metrics,
+                  ensemble_components,
+                  onStorageFull: () => setShowUpgradeModal(true),
+                });
+                await refreshStorage();
+              }}
+              className="bg-teal-600 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-teal-700 transition cursor-pointer"
+            >
+              Simpan ke Historis
+            </button>
+          )}
+          {!fromHistory && (
+            <Link
+              href="/history"
+              className="flex items-center gap-3 bg-gray-500 text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-600 transition cursor-pointer"
+            >
+              <span>Page Data Histories</span>
+            </Link>
+          )}
         </div>
       </div>
 

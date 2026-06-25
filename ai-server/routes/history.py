@@ -1,6 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 import os, json
 from config import UPLOAD_FOLDER
+from config import OUTPUT_FOLDER
 from utils.registry import get_model_dir_for_user, get_snapshot_limit
 
 history_bp = Blueprint("history_bp", __name__)
@@ -171,7 +172,7 @@ def storage_info():
     # hash cache count
     hash_count = len(user.get("snapshots", []))
 
-    usage = history_size + csv_size 
+    usage = history_size + csv_size + model_size
 
     print("HISTORY COUNT =", len(user.get("history", [])))
     print("HISTORY SIZE =", history_size)
@@ -284,8 +285,8 @@ def download_history_csv():
     if filename not in history_files:
         return jsonify({"success": False, "message": "Akses ditolak"}), 403
 
-    filepath = os.path.join(UPLOAD_FOLDER, filename)
+    filepath = os.path.join(OUTPUT_FOLDER, filename)
     if not os.path.exists(filepath):
         return jsonify({"success": False, "message": "File tidak ditemukan"}), 404
-
+    
     return send_file(filepath, as_attachment=True, download_name=filename)
