@@ -25,6 +25,7 @@ interface HistorisItem {
   id: number;
   waktu: string;
   file: string;
+  output_file?: string;
   algo: string;
   periode: string;
   status: StatusKey;
@@ -127,18 +128,25 @@ export default function HistorisPage() {
 
   async function handleDownloadCSV(row: HistorisItem) {
     const username = sessionStorage.getItem("ventara_username") || "";
+    const fileToDownload = row.output_file || row.file;
+
+    console.log("row.file:", row.file);
+    console.log("row.output_file:", row.output_file);
+    console.log("fileToDownload:", fileToDownload);
     const res = await fetch(
-      `/api/download-history-csv?username=${username}&file=${encodeURIComponent(row.file)}`,
+      `/api/download-history-csv?username=${username}&file=${encodeURIComponent(fileToDownload)}`,
     );
     if (!res.ok) {
       alert("File tidak tersedia");
       return;
     }
+
+    console.log("response status:", res.status);
     const blob = await res.blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = row.file;
+    a.download = row.output_file || row.file;
     a.click();
     URL.revokeObjectURL(url);
   }

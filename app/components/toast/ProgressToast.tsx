@@ -141,7 +141,7 @@ export default function ProgressToast({
           </span>
           <button
             onClick={() => setMinimized(true)}
-            className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+            className="w-7 h-7 flex items-center justify-center rounded-lg border border-gray-300 bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-800 transition-colors cursor-pointer"
             title="Minimize"
           >
             <svg

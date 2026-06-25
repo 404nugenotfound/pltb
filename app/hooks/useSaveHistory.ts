@@ -4,6 +4,7 @@ import toast from "react-hot-toast";
 
 interface SaveHistoryPayload {
   file: string;
+  output_file: string;
   algo: string;
   periode: string;
   nlp_report: string;
@@ -17,6 +18,7 @@ export function useSaveHistory() {
 
   const saveHistory = async ({
     file,
+    output_file,
     algo,
     periode,
     nlp_report,
@@ -31,6 +33,7 @@ export function useSaveHistory() {
         id: Date.now(),
         waktu: new Date().toLocaleString("id-ID"),
         file,
+        output_file,
         algo,
         periode,
         status: "Selesai",

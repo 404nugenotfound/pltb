@@ -2160,9 +2160,10 @@
   "history": [
     {
       "entry": {
-        "id": 1782367168561,
-        "waktu": "25/6/2026, 12.59.28",
+        "id": 1782369786797,
+        "waktu": "25/6/2026, 13.43.06",
         "file": "NASA_Sukabumi_Hourly.csv",
+        "output_file": "Nailrizq123_hasil_prediksi_best.csv",
         "algo": "Best",
         "periode": "168 Jam",
         "status": "Selesai",

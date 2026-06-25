@@ -14,6 +14,7 @@ from config import TARGET
 
 from utils.dataset import *
 from utils.progress import *
+from utils.user_helpers import log_usage
 
 from training.nlp import *
 from training.metrics import load_metrics_for_var, load_dl_metrics_for_var
@@ -53,6 +54,7 @@ def get_progress():
             "day": day,
             "total": total,
             "mode": p.get("mode", ""),
+            "current_var": p.get("current_var", ""), 
             "eta": eta_str,
             "elapsed": f"{int(elapsed//60)}m {int(elapsed%60)}s",
             "error": p.get("error"),
@@ -417,6 +419,8 @@ def _worker_generate_full(
             f.write(f"Variabel: {selected_var}\n")
             f.write(f"Forecast Summary:\n{nlp_report}\n\n-END HEADER-\n\n")
             df_out.to_csv(f, index=False, sep=";")
+            
+        log_usage(username, "generate_full") 
 
         with progress_lock:
             generate_progress[username].update(
@@ -656,6 +660,7 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
                     with progress_lock:
                         generate_progress[username]["day"] = day_overall
                         generate_progress[username]["total"] = 7 * len(TRAIN_VARS)
+                        generate_progress[username]["current_var"] = var  # ← tambah ini
                     print(f"⏳ [{var}] Day {(i//24)+1}/7")
 
                 next_time = last_time + pd.Timedelta(hours=i + 1)
@@ -851,6 +856,8 @@ def _worker_generate_best(username: str, dataset_path: str) -> None:
                 f.write(f"{info}\n")
             f.write(f"\nForecast Summary:\n{nlp_report}\n\n-END HEADER-\n\n")
             df_combined.to_csv(f, index=False, sep=";")
+        
+        log_usage(username, "generate_best")  # ← tambah
 
         with progress_lock:
             generate_progress[username].update(
@@ -946,7 +953,8 @@ def generate_best():
             "done": False,
             "day": 0,
             "total": 7 * len(TRAIN_VARS),
-            "mode": "Best Stacking (All Variables)",
+            "mode": "best",        # ← ganti ini
+            "current_var": "",     # ← tambah ini
             "start_time": time.time(),
             "error": None,
             "nlp_report": None,

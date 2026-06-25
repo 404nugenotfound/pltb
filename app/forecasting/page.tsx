@@ -139,6 +139,7 @@ export default function ForecastingPage() {
             JSON.stringify(ensembleSummary),
           );
         }
+        await refreshMetrics(); // ← TAMBAH INI
       },
       selectedVars,
     );

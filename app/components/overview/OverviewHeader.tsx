@@ -45,6 +45,7 @@ export default function OverviewHeader({
           {!fromHistory && (
             <button
               onClick={async () => {
+                console.log("datasetName:", datasetName); // ← tambah ini
                 const username =
                   sessionStorage.getItem("ventara_username") || "";
                 let metrics = null;
@@ -63,13 +64,14 @@ export default function OverviewHeader({
                 } catch {}
 
                 const outputFile =
-                  datasetName ||
-                  (generateMode === "best"
+                  generateMode === "best"
                     ? `${username}_hasil_prediksi_best.csv`
-                    : `${username}_hasil_prediksi_general.csv`);
+                    : `${username}_hasil_prediksi_general.csv`;
+
 
                 saveHistory({
-                  file: outputFile,
+                  file: datasetName || outputFile,
+                  output_file: outputFile,
                   algo: generateMode === "best" ? "Best" : "General Model",
                   periode: "168 Jam",
                   nlp_report: nlpReport,

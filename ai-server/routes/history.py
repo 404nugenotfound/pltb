@@ -278,7 +278,7 @@ def download_history_csv():
     history_files = set()
     for item in user.get("history", []):
         entry = item.get("entry", item)
-        f = entry.get("file", "")
+        f = entry.get("output_file") or entry.get("file", "")  # ← tambah output_file
         if f:
             history_files.add(f)
 
